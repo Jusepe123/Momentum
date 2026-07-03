@@ -1,0 +1,1 @@
+- [Momentum 0001 schema review](momentum_0001_schema_review.md) — pre-apply findings for initial migration incl. CRITICAL FK cascade/restrict ordering bug (exercises vs strength_sets)
