@@ -143,7 +143,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      replace_session_details: {
+        Args: {
+          p_session_id: string
+          p_sets?: Json
+          p_distance_m?: number | null
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       sport: "strength" | "run" | "swim"

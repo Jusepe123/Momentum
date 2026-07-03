@@ -1,1 +1,2 @@
 - [Momentum 0001 schema review](momentum_0001_schema_review.md) — pre-apply findings for initial migration incl. CRITICAL FK cascade/restrict ordering bug (exercises vs strength_sets)
+- [Momentum 0002 replace_session_details review](momentum_0002_replace_session_details_review.md) — RPC security sound (no CRITICAL); HIGH: unconditional delete + conditional insert silently wipes cardio_details if p_distance_m omitted

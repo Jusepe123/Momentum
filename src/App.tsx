@@ -1,8 +1,20 @@
+import { Navigate, Route, Routes } from 'react-router-dom'
+import { LoginPage } from './features/auth/LoginPage'
+import { ProtectedLayout } from './features/auth/ProtectedLayout'
+import { SessionFormPage } from './features/sessions/SessionFormPage'
+import { SessionsPage } from './features/sessions/SessionsPage'
+
 function App() {
   return (
-    <main className="flex min-h-screen items-center justify-center">
-      <h1 className="text-2xl font-semibold">Momentum</h1>
-    </main>
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route element={<ProtectedLayout />}>
+        <Route path="/" element={<SessionsPage />} />
+        <Route path="/sessions/new" element={<SessionFormPage />} />
+        <Route path="/sessions/:id/edit" element={<SessionFormPage />} />
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   )
 }
 

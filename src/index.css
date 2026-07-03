@@ -1,1 +1,37 @@
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/space-grotesk";
 @import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter Variable", system-ui, sans-serif;
+  --font-display: "Space Grotesk Variable", "Inter Variable", system-ui, sans-serif;
+
+  /* Dark-first palette: deep blue-gray, never pure black. */
+  --color-surface: #0f1115;
+  --color-panel: #16191f;
+  --color-panel-2: #1d212a;
+  --color-line: #262b35;
+  --color-ink: #e7e9ee;
+  --color-ink-dim: #9aa1ad;
+  --color-ink-faint: #6b7280;
+
+  /* One accent: amber. Primary actions and key highlights only. */
+  --color-accent: #f5a623;
+  --color-accent-deep: #d98b0f;
+
+  --color-danger: #f0655a;
+  --color-ok: #4ade80;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-surface font-sans text-ink antialiased;
+}
+
+/* Data and headings share the display face with tabular numerals. */
+.font-display {
+  font-feature-settings: "tnum";
+}
