@@ -39,6 +39,9 @@ export function ProtectedLayout() {
             </NavLink>
             <div className="flex items-center gap-1">
               <NavLink to="/" end className={linkClass}>
+                Dashboard
+              </NavLink>
+              <NavLink to="/sessions" end className={linkClass}>
                 Sessions
               </NavLink>
             </div>

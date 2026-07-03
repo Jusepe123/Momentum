@@ -206,7 +206,7 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
       } else {
         await createSession.mutateAsync(draft)
       }
-      navigate('/')
+      navigate('/sessions')
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Something went wrong.')
     }
@@ -392,7 +392,7 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
           <Button type="submit" disabled={busy} className="flex-1">
             {busy ? <Spinner /> : isEdit ? 'Save changes' : 'Log session'}
           </Button>
-          <Button type="button" variant="ghost" onClick={() => navigate('/')}>
+          <Button type="button" variant="ghost" onClick={() => navigate('/sessions')}>
             Cancel
           </Button>
         </div>
