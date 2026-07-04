@@ -64,6 +64,9 @@ export function advance(
   point: GeoPoint,
   cfg: FilterConfig = DEFAULT_FILTER,
 ): DistanceState {
+  // Deliberate: a null accuracy is trusted. Some OEM stacks omit it, and
+  // dropping those fixes would zero the whole run; the displacement and
+  // speed gates below still bound the damage from a bad fix.
   if (point.accuracy !== null && point.accuracy > cfg.maxAccuracyM) return state
   if (state.anchor === null) return { totalM: state.totalM, anchor: point }
 

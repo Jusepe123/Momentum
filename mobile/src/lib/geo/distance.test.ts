@@ -84,6 +84,15 @@ describe('advance', () => {
     expect(s.anchor?.latitude).toBeCloseTo(10 * DEG_PER_M, 12)
   })
 
+  it('keeps exact-boundary values on the accepting side of each gate', () => {
+    // accuracy === 25 is accepted (rule is >25 drops)
+    expect(feed([pt(0, 0, 25), pt(10, 5000, 25)]).totalM).toBeCloseTo(10, 6)
+    // displacement === 5 m accumulates (rule is <5 keeps the old anchor)
+    expect(feed([pt(0, 0), pt(5, 3000)]).totalM).toBeCloseTo(5, 6)
+    // speed === 12.5 m/s accumulates (rule is >12.5 teleports): 5 m in 0.4 s
+    expect(feed([pt(0, 0), pt(5, 400)]).totalM).toBeCloseTo(5, 6)
+  })
+
   it('is immune to interleaved bad-accuracy garbage', () => {
     const clean = Array.from({ length: 50 }, (_, i) => pt(i * 10, i * 5000))
     const dirty: GeoPoint[] = []

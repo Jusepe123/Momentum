@@ -3,7 +3,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { useRunStore } from '../../tracking/store'
 import { activeElapsedMs } from '../../lib/geo/elapsed'
 import { formatElapsed, formatKm, formatPace } from '../../lib/format'
-import { addPending, newPendingId, removePending, type PendingRun } from '../../upload/pending'
+import { addPending, removePending, type PendingRun } from '../../upload/pending'
 import { uploadRun } from '../../upload/uploadRun'
 import { Button, ErrorText, Input } from '../../components/ui'
 import { colors, fonts } from '../../theme'
@@ -20,15 +20,17 @@ export function SummaryScreen({ userId: _userId }: { userId: string }) {
   const segments = useRunStore((s) => s.segments)
   const distanceM = useRunStore((s) => s.distance.totalM)
   const dateLocal = useRunStore((s) => s.dateLocal)
+  // Assigned by the store at finish() and persisted in the snapshot, so a
+  // remount or process death can't mint a second identity → no duplicate
+  // queue entries, and the upload itself is idempotent on this id.
+  const uploadId = useRunStore((s) => s.uploadId)
   const reset = useRunStore((s) => s.reset)
 
   const [rpe, setRpe] = useState<number | null>(null)
   const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  // Set once the run has been queued: from then on the button reads Retry and
-  // the queue entry (not component state) is the source of truth.
-  const [pendingId, setPendingId] = useState<string | null>(null)
+  const [attempted, setAttempted] = useState(false)
 
   // Segments are all closed after finish, so `now` is irrelevant — but compute
   // once and freeze so the summary can never tick.
@@ -36,11 +38,12 @@ export function SummaryScreen({ userId: _userId }: { userId: string }) {
   const noDistance = distanceM < 1
 
   async function handleUpload() {
-    if (rpe === null || dateLocal === null) return
+    if (rpe === null || dateLocal === null || uploadId === null) return
     setError(null)
     setBusy(true)
+    setAttempted(true)
     const run: PendingRun = {
-      id: pendingId ?? newPendingId(),
+      id: uploadId,
       dateLocal,
       activeMs,
       distanceM,
@@ -50,7 +53,6 @@ export function SummaryScreen({ userId: _userId }: { userId: string }) {
     try {
       // Queue first: a crash or dead network mid-upload must never lose the run.
       await addPending(run)
-      setPendingId(run.id)
       await uploadRun(run)
       await removePending(run.id)
       reset() // back to the idle run screen
@@ -70,7 +72,7 @@ export function SummaryScreen({ userId: _userId }: { userId: string }) {
         text: 'Discard',
         style: 'destructive',
         onPress: () => {
-          if (pendingId) void removePending(pendingId)
+          if (uploadId) void removePending(uploadId)
           reset()
         },
       },
@@ -145,7 +147,7 @@ export function SummaryScreen({ userId: _userId }: { userId: string }) {
 
           <View style={styles.actions}>
             <Button
-              title={pendingId && error ? 'Retry upload' : 'Upload run'}
+              title={attempted && error ? 'Retry upload' : 'Upload run'}
               onPress={handleUpload}
               busy={busy}
               disabled={rpe === null}

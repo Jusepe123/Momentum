@@ -8,6 +8,7 @@ import {
   type GeoPoint,
 } from '../lib/geo/distance'
 import type { Segment } from '../lib/geo/elapsed'
+import { uuid4 } from '../lib/uuid'
 
 export type RunStatus = 'idle' | 'recording' | 'paused' | 'finished'
 
@@ -19,6 +20,10 @@ interface Snapshot {
   /** Local calendar date captured at run START — never recomputed at upload,
    *  or a retried upload the next morning would shift the ACWR day bucket. */
   dateLocal: string | null
+  /** Assigned once at finish; becomes the sessions.id on upload so retries
+   *  are idempotent. Lives in the snapshot (not component state) so a
+   *  process death between finish and upload can't mint a second identity. */
+  uploadId: string | null
 }
 
 const SNAPSHOT_KEY = 'run_snapshot'
@@ -28,6 +33,7 @@ const idleSnapshot: Snapshot = {
   segments: [],
   distance: initialDistanceState,
   dateLocal: null,
+  uploadId: null,
 }
 
 interface RunStore extends Snapshot {
@@ -45,16 +51,31 @@ interface RunStore extends Snapshot {
   ensureHydrated: () => Promise<void>
 }
 
+// Snapshot writes are serialized on one chain so they can never land
+// out of call order (e.g. a slow 'recording' write overwriting 'finished').
+let writeChain: Promise<void> = Promise.resolve()
+
 function persist(state: Snapshot) {
   const snap: Snapshot = {
     status: state.status,
     segments: state.segments,
     distance: state.distance,
     dateLocal: state.dateLocal,
+    uploadId: state.uploadId,
   }
-  AsyncStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snap)).catch(() => {
-    // A missed snapshot only widens the resurrection gap by one batch.
-  })
+  const payload = JSON.stringify(snap)
+  writeChain = writeChain.then(
+    () =>
+      AsyncStorage.setItem(SNAPSHOT_KEY, payload).catch(() => {
+        // A missed snapshot only widens the resurrection gap by one batch.
+      }),
+  )
+}
+
+/** Await this after start/finish so a kill right after the tap can't
+ *  resurrect the run in its pre-transition state. */
+export function flushSnapshot(): Promise<void> {
+  return writeChain
 }
 
 let hydration: Promise<void> | null = null
@@ -68,6 +89,7 @@ export const useRunStore = create<RunStore>()((set, get) => ({
       segments: [{ startedAt: now, endedAt: null }],
       distance: initialDistanceState,
       dateLocal,
+      uploadId: null,
     }
     set(next)
     persist(next)
@@ -97,13 +119,13 @@ export const useRunStore = create<RunStore>()((set, get) => ({
     const { status, segments } = get()
     if (status !== 'recording' && status !== 'paused') return
     const closed = segments.map((s) => (s.endedAt === null ? { ...s, endedAt: now } : s))
-    set({ status: 'finished', segments: closed })
+    set({ status: 'finished', segments: closed, uploadId: uuid4() })
     persist(get())
   },
 
   reset: () => {
     set(idleSnapshot)
-    AsyncStorage.removeItem(SNAPSHOT_KEY).catch(() => {})
+    writeChain = writeChain.then(() => AsyncStorage.removeItem(SNAPSHOT_KEY).catch(() => {}))
   },
 
   ingest: (points) => {
@@ -123,7 +145,13 @@ export const useRunStore = create<RunStore>()((set, get) => ({
           // Only adopt a snapshot that represents an in-flight or unfinished
           // run; a stale idle snapshot has nothing to restore.
           if (snap.status && snap.status !== 'idle') {
-            useRunStore.setState(snap)
+            // Older snapshots may predate uploadId; a finished run must have
+            // one stable identity before any upload attempt.
+            if (snap.status === 'finished' && !snap.uploadId) {
+              snap.uploadId = uuid4()
+            }
+            useRunStore.setState({ ...idleSnapshot, ...snap })
+            persist(useRunStore.getState())
           }
         } catch {
           // Corrupt snapshot: start clean rather than crash a run.

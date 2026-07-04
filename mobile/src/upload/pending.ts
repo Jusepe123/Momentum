@@ -18,10 +18,6 @@ export interface PendingRun {
 const KEY = 'pending_runs'
 const CAP = 10
 
-export function newPendingId(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-}
-
 export async function listPending(): Promise<PendingRun[]> {
   try {
     const raw = await AsyncStorage.getItem(KEY)
@@ -36,9 +32,14 @@ export async function listPending(): Promise<PendingRun[]> {
 export async function addPending(run: PendingRun): Promise<void> {
   const list = await listPending()
   const next = [...list.filter((r) => r.id !== run.id), run]
-  // Cap the queue; oldest first out. Ten unsynced runs means something else
-  // is wrong anyway.
-  await AsyncStorage.setItem(KEY, JSON.stringify(next.slice(-CAP)))
+  if (next.length > CAP) {
+    // Never silently drop a recorded run — the caller surfaces this and the
+    // run stays alive in the store snapshot until it's uploaded or discarded.
+    throw new Error(
+      `${CAP} runs are already waiting to upload — sync them from the start screen first.`,
+    )
+  }
+  await AsyncStorage.setItem(KEY, JSON.stringify(next))
 }
 
 export async function removePending(id: string): Promise<void> {

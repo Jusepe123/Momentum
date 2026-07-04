@@ -2,7 +2,7 @@ import * as Location from 'expo-location'
 import { Alert, PermissionsAndroid, Platform } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { LOCATION_TASK } from './locationTask'
-import { useRunStore } from './store'
+import { flushSnapshot, useRunStore } from './store'
 import { todayLocalISO } from '../lib/dates'
 import { colors } from '../theme'
 
@@ -39,6 +39,7 @@ export async function startRun(): Promise<StartResult> {
 
   // Start the store BEFORE the updates so the first GPS batch isn't discarded.
   useRunStore.getState().start(todayLocalISO(), Date.now())
+  await flushSnapshot()
 
   try {
     await Location.startLocationUpdatesAsync(LOCATION_TASK, {
@@ -76,6 +77,8 @@ export function resumeRun() {
 
 export async function finishRun() {
   useRunStore.getState().finish(Date.now())
+  // Make sure 'finished' is on disk before anything else can kill the app.
+  await flushSnapshot()
   await stopTracking()
 }
 

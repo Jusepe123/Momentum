@@ -18,6 +18,7 @@ export function RunScreen() {
   const [starting, setStarting] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
   const [syncing, setSyncing] = useState(false)
+  const [finishing, setFinishing] = useState(false)
   const [, forceTick] = useState(0)
 
   // Runs finished earlier but never uploaded (dead network, crash) wait in
@@ -43,6 +44,15 @@ export function RunScreen() {
     const result = await startRun()
     setStarting(false)
     if (!result.ok) setError(result.message)
+  }
+
+  async function handleFinish() {
+    setFinishing(true)
+    try {
+      await finishRun() // status flips to 'finished'; App swaps to the summary
+    } finally {
+      setFinishing(false)
+    }
   }
 
   async function handleSyncPending() {
@@ -118,20 +128,25 @@ export function RunScreen() {
         {status === 'recording' && (
           <View style={styles.actionRow}>
             <View style={{ flex: 1 }}>
-              <Button title="Pause" variant="ghost" onPress={pauseRun} />
+              <Button title="Pause" variant="ghost" onPress={pauseRun} disabled={finishing} />
             </View>
             <View style={{ flex: 1 }}>
-              <Button title="Finish" onPress={() => void finishRun()} />
+              <Button title="Finish" onPress={() => void handleFinish()} busy={finishing} />
             </View>
           </View>
         )}
         {status === 'paused' && (
           <View style={styles.actionRow}>
             <View style={{ flex: 1 }}>
-              <Button title="Resume" onPress={resumeRun} />
+              <Button title="Resume" onPress={resumeRun} disabled={finishing} />
             </View>
             <View style={{ flex: 1 }}>
-              <Button title="Finish" variant="ghost" onPress={() => void finishRun()} />
+              <Button
+                title="Finish"
+                variant="ghost"
+                onPress={() => void handleFinish()}
+                busy={finishing}
+              />
             </View>
           </View>
         )}
