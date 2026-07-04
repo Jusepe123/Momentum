@@ -474,17 +474,25 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-3">
-      <h1 className="sr-only">Dashboard</h1>
-      <div className="grid gap-3 lg:grid-cols-3">
-        <div className="flex flex-col gap-3">
-          <RiskCard sessions={sessions} today={today} />
-          {/* Optional artwork: drop public/brand/dashboard-hero.png and reload. */}
-          <BrandImage
-            src="/brand/dashboard-hero.png"
-            alt=""
-            className="min-h-0 w-full flex-1 rounded-xl border border-line object-cover"
-          />
+      {/* Presentation banner — artwork drops in at public/brand/dashboard-hero.png.
+          bg matches the artwork's paper color so image and banner read as one piece. */}
+      <section className="flex items-center justify-between gap-4 overflow-hidden rounded-xl border border-line bg-[#f4f4ef]">
+        <div className="shrink-0 py-5 pl-6 pr-2">
+          <h1 className="font-display text-2xl font-bold tracking-tight">
+            Your gains, visualized<span className="text-accent">.</span>
+          </h1>
+          <p className="mt-1 max-w-xs text-sm text-ink-dim">
+            Strength, runs and swims — one load scale, one trend.
+          </p>
         </div>
+        <BrandImage
+          src="/brand/dashboard-hero.png"
+          alt=""
+          className="hidden h-36 min-w-0 object-contain object-right sm:block md:h-44"
+        />
+      </section>
+      <div className="grid gap-3 lg:grid-cols-3">
+        <RiskCard sessions={sessions} today={today} />
         <div className="lg:col-span-2">
           <LoadTrendCard sessions={sessions} today={today} />
         </div>

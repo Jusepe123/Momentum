@@ -46,6 +46,10 @@ Light editorial minimal. Tokens in `src/index.css` `@theme`: warm off-white page
 
 Brand assets are drop-in overrides (see `public/brand/README.md`): `src/components/brand.tsx` tries `/brand/logo.png` (falls back to an inline SVG mark) and `/brand/dashboard-hero.png` (renders nothing if absent) — the user drops PNGs there, no code change.
 
+Gotcha: `Input`/`Select` bake in `w-full`, and in the compiled CSS `.w-full` sorts *after* the numeric widths — so a `w-24` passed via className silently loses and the control goes full-width (this once collapsed the exercise select to its chevron). Narrow overrides must use the important form: `!w-24`.
+
+For visual verification there's `playwright-core` in devDependencies — it drives the system Edge (`chromium.launch({ channel: 'msedge' })`), no browser download needed. Signups need their email confirmed manually in `auth.users` (confirmation emails are on and rate-limited).
+
 ## Notes
 
 - The user may have `[demo]`-tagged seed sessions in the dev database (identifiable via `notes like '[demo]%'`); delete only those when asked to clean up demo data.
