@@ -346,7 +346,7 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
                 autoFocus
                 value={duration}
                 onChange={(e) => setDuration(e.target.value)}
-                className="!h-10 w-24"
+                className="!h-10 !w-24"
               />
             )}
           </div>
@@ -402,7 +402,7 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
                 placeholder={meta.distanceUnit === 'km' ? '8.5' : '1500'}
                 value={distance}
                 onChange={(e) => setDistance(e.target.value)}
-                className="!h-10 w-28"
+                className="!h-10 !w-28"
               />
             </div>
           </Field>
@@ -479,7 +479,7 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
                     placeholder="kg"
                     value={s.weightKg}
                     onChange={(e) => updateSet(s.key, { weightKg: e.target.value })}
-                    className="w-24"
+                    className="!w-24 shrink-0"
                   />
                   <Input
                     aria-label="Reps"
@@ -492,7 +492,7 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
                     placeholder="reps"
                     value={s.reps}
                     onChange={(e) => updateSet(s.key, { reps: e.target.value })}
-                    className="w-20"
+                    className="!w-20 shrink-0"
                   />
                   <button
                     type="button"

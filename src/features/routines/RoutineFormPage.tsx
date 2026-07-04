@@ -203,7 +203,7 @@ function RoutineForm({ existing }: { existing?: RoutineWithSets }) {
                   placeholder="kg?"
                   value={s.weightKg}
                   onChange={(e) => updateSet(s.key, { weightKg: e.target.value })}
-                  className="w-24"
+                  className="!w-24 shrink-0"
                 />
                 <Input
                   aria-label="Reps"
@@ -216,7 +216,7 @@ function RoutineForm({ existing }: { existing?: RoutineWithSets }) {
                   placeholder="reps"
                   value={s.reps}
                   onChange={(e) => updateSet(s.key, { reps: e.target.value })}
-                  className="w-20"
+                  className="!w-20 shrink-0"
                 />
                 <button
                   type="button"
