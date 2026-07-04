@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { StatusBar } from 'expo-status-bar'
-import { StyleSheet, View } from 'react-native'
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
 import { useFonts } from 'expo-font'
 import { SpaceGrotesk_500Medium, SpaceGrotesk_700Bold } from '@expo-google-fonts/space-grotesk'
 import { Inter_400Regular, Inter_600SemiBold } from '@expo-google-fonts/inter'
@@ -13,33 +13,60 @@ import { RunScreen } from './src/features/run/RunScreen'
 import { SummaryScreen } from './src/features/run/SummaryScreen'
 import { colors } from './src/theme'
 
+const FONT_TIMEOUT_MS = 5000
+
 export default function App() {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     SpaceGrotesk_500Medium,
     SpaceGrotesk_700Bold,
     Inter_400Regular,
     Inter_600SemiBold,
   })
+  const [fontTimedOut, setFontTimedOut] = useState(false)
   const [session, setSession] = useState<Session | null>(null)
   const [authReady, setAuthReady] = useState(false)
   const [runReady, setRunReady] = useState(false)
   const status = useRunStore((s) => s.status)
 
+  // Custom fonts must never be able to blank the app: on error or timeout we
+  // proceed and Android falls back to the system font.
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
-      setAuthReady(true)
-    })
+    const id = setTimeout(() => setFontTimedOut(true), FONT_TIMEOUT_MS)
+    return () => clearTimeout(id)
+  }, [])
+  useEffect(() => {
+    if (fontError) console.warn('[App] font loading failed:', fontError.message)
+  }, [fontError])
+
+  useEffect(() => {
+    supabase.auth
+      .getSession()
+      .then(({ data }) => setSession(data.session))
+      .catch((e) => console.warn('[App] getSession failed:', e))
+      .finally(() => setAuthReady(true))
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
       setSession(next)
     })
     // Restore a live run from the snapshot / stop an orphaned location task.
-    reconcileOnLaunch().finally(() => setRunReady(true))
+    reconcileOnLaunch()
+      .catch((e) => console.warn('[App] reconcileOnLaunch failed:', e))
+      .finally(() => setRunReady(true))
     return () => sub.subscription.unsubscribe()
   }, [])
 
-  if (!fontsLoaded || !authReady || !runReady) {
-    return <View style={styles.root} />
+  const fontsSettled = fontsLoaded || !!fontError || fontTimedOut
+
+  if (!fontsSettled || !authReady || !runReady) {
+    // Visible loading state — a silent white screen is never acceptable.
+    return (
+      <View style={[styles.root, styles.center]}>
+        <Text style={styles.loadingWordmark}>Momentum.</Text>
+        <ActivityIndicator color={colors.ink} />
+        <Text style={styles.loadingHint}>
+          {!authReady ? 'Checking session…' : !runReady ? 'Restoring state…' : 'Loading fonts…'}
+        </Text>
+      </View>
+    )
   }
 
   return (
@@ -60,5 +87,21 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.surface,
+  },
+  center: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  // System font on purpose: the loading screen must not depend on the very
+  // fonts it may be waiting for.
+  loadingWordmark: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  loadingHint: {
+    fontSize: 13,
+    color: colors.inkDim,
   },
 })
