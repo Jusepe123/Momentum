@@ -50,6 +50,12 @@ Gotcha: `Input`/`Select` bake in `w-full`, and in the compiled CSS `.w-full` sor
 
 For visual verification there's `playwright-core` in devDependencies — it drives the system Edge (`chromium.launch({ channel: 'msedge' })`), no browser download needed. Signups need their email confirmed manually in `auth.users` (confirmation emails are on and rate-limited).
 
+## Mobile app (`mobile/`)
+
+Expo **SDK 52** (pinned — user's choice; use `npx expo install` for native deps) Android run recorder; own `package.json`, no workspaces. Same Supabase project/auth/RLS — it inserts ordinary `sessions` + `cardio_details` rows; zero web changes. Commands (from `mobile/`): `npm run typecheck`, `npm test` (vitest — pure modules in `src/lib/geo/` + `src/lib/format.ts` follow the same test-first culture), `npx eas-cli build -p android --profile preview` (standalone APK) or `development` (dev client; background GPS never works in Expo Go). EAS project `@jose_cisternas/momentum-mobile`; env lives in `mobile/.env` (git-ignored) AND `eas.json` env blocks (anon key is publishable by design).
+
+Invariants (see `mobile/README.md` for the full list): `index.ts` imports `src/tracking/locationTask.ts` first (headless launches); run date captured at START via `todayLocalISO()`, never at upload; upload idempotent — `sessions.id` is a client UUID minted at `finish()` and persisted in the run snapshot (`run_snapshot` in AsyncStorage), unique violation = already uploaded; pause never stops the foreground service (ingest discards instead); snapshot writes are serialized (`flushSnapshot()` awaited at start/finish). Distance-filter thresholds in `DEFAULT_FILTER` are calibration knobs; the rules' semantics are pinned by `distance.test.ts` incl. exact gate boundaries.
+
 ## Notes
 
 - The user may have `[demo]`-tagged seed sessions in the dev database (identifiable via `notes like '[demo]%'`); delete only those when asked to clean up demo data.
