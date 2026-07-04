@@ -12,11 +12,6 @@ const config: ExpoConfig = {
   icon: './assets/icon.png',
   userInterfaceStyle: 'light',
   newArchEnabled: true,
-  splash: {
-    image: './assets/splash-icon.png',
-    resizeMode: 'contain',
-    backgroundColor: '#f7f7f5',
-  },
   android: {
     package: 'com.jusepe.momentum',
     adaptiveIcon: {
@@ -33,6 +28,18 @@ const config: ExpoConfig = {
     },
   },
   plugins: [
+    // SDK 52 splash goes through this plugin (Android 12 SplashScreen API).
+    // imageWidth is mandatory sanity: a raw 1024px image renders as a huge
+    // cropped zoom in the fixed center slot (seen on device).
+    [
+      'expo-splash-screen',
+      {
+        image: './assets/splash-icon.png',
+        imageWidth: 160,
+        resizeMode: 'contain',
+        backgroundColor: '#f7f7f5',
+      },
+    ],
     ['expo-notifications', { color: '#0d9488' }],
     [
       'expo-location',

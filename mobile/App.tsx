@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Component, useEffect, useState, type ReactNode } from 'react'
 import { StatusBar } from 'expo-status-bar'
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
 import { useFonts } from 'expo-font'
@@ -15,7 +15,38 @@ import { colors } from './src/theme'
 
 const FONT_TIMEOUT_MS = 5000
 
+/** A crash must always produce readable text on screen — never an app frozen
+ *  behind the splash or a silent blank view. */
+class CrashScreen extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null as Error | null }
+
+  static getDerivedStateFromError(error: Error) {
+    return { error }
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <View style={[styles.root, styles.crash]}>
+          <Text style={styles.crashTitle}>Something crashed</Text>
+          <Text style={styles.crashMessage}>{this.state.error.message}</Text>
+          <Text style={styles.crashHint}>Screenshot this and send it to José.</Text>
+        </View>
+      )
+    }
+    return this.props.children
+  }
+}
+
 export default function App() {
+  return (
+    <CrashScreen>
+      <Root />
+    </CrashScreen>
+  )
+}
+
+function Root() {
   const [fontsLoaded, fontError] = useFonts({
     SpaceGrotesk_500Medium,
     SpaceGrotesk_700Bold,
@@ -101,6 +132,26 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   loadingHint: {
+    fontSize: 13,
+    color: colors.inkDim,
+  },
+  // System fonts on purpose — must render under any failure mode.
+  crash: {
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    padding: 24,
+    gap: 10,
+  },
+  crashTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  crashMessage: {
+    fontSize: 14,
+    color: colors.danger,
+  },
+  crashHint: {
     fontSize: 13,
     color: colors.inkDim,
   },
