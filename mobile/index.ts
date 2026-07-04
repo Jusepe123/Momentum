@@ -1,8 +1,8 @@
-import { registerRootComponent } from 'expo';
+// The background location task MUST be defined before anything else runs,
+// so a headless (killed-app) launch still has the task registered.
+import './src/tracking/locationTask'
 
-import App from './App';
+import { registerRootComponent } from 'expo'
+import App from './App'
 
-// registerRootComponent calls AppRegistry.registerComponent('main', () => App);
-// It also ensures that whether you load the app in Expo Go or in a native build,
-// the environment is set up appropriately
-registerRootComponent(App);
+registerRootComponent(App)
