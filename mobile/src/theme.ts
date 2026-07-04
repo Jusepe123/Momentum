@@ -5,6 +5,7 @@
 export const colors = {
   surface: '#f7f7f5', // warm off-white page
   panel: '#ffffff', // cards
+  paper: '#f4f4ef', // brand artwork paper color (sampled from the hero PNG)
   line: '#e6e5e1', // hairline borders
   ink: '#1a1a18', // near-black text
   inkDim: '#6f6e69',

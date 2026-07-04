@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import {
+  Image,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -44,6 +45,7 @@ export function SignInScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.card}>
+        <Image source={require('../../../assets/brand/logo.png')} style={styles.logo} />
         <Text style={styles.title}>
           Momentum<Text style={{ color: colors.accent }}>.</Text>
         </Text>
@@ -73,6 +75,14 @@ export function SignInScreen() {
         {error && <ErrorText>{error}</ErrorText>}
         <Button title="Sign in" onPress={handleSignIn} busy={busy} />
       </View>
+
+      <View style={styles.heroBand}>
+        <Image
+          source={require('../../../assets/brand/hero.png')}
+          style={styles.heroImage}
+          resizeMode="contain"
+        />
+      </View>
     </KeyboardAvoidingView>
   )
 }
@@ -86,6 +96,25 @@ const styles = StyleSheet.create({
   },
   card: {
     gap: 16,
+  },
+  logo: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+  },
+  // Same treatment as the web dashboard banner: artwork on its own paper
+  // color inside a hairline-bordered card.
+  heroBand: {
+    marginTop: 28,
+    backgroundColor: colors.paper,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  heroImage: {
+    width: '100%',
+    aspectRatio: 1408 / 768,
   },
   title: {
     fontFamily: fonts.display,

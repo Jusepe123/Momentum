@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { Image, StyleSheet, Text, View } from 'react-native'
 import { useRunStore } from '../../tracking/store'
 import { finishRun, pauseRun, resumeRun, startRun } from '../../tracking/recorder'
 import { activeElapsedMs } from '../../lib/geo/elapsed'
@@ -74,9 +74,12 @@ export function RunScreen() {
   return (
     <View style={styles.root}>
       <View style={styles.header}>
-        <Text style={styles.wordmark}>
-          Momentum<Text style={{ color: colors.accent }}>.</Text>
-        </Text>
+        <View style={styles.headerBrand}>
+          <Image source={require('../../../assets/brand/logo.png')} style={styles.headerLogo} />
+          <Text style={styles.wordmark}>
+            Momentum<Text style={{ color: colors.accent }}>.</Text>
+          </Text>
+        </View>
         {status !== 'idle' && (
           <View style={styles.statusPill}>
             <View
@@ -108,6 +111,16 @@ export function RunScreen() {
           </View>
         </View>
       </View>
+
+      {status === 'idle' && (
+        <View style={styles.heroBand}>
+          <Image
+            source={require('../../../assets/brand/hero.png')}
+            style={styles.heroImage}
+            resizeMode="contain"
+          />
+        </View>
+      )}
 
       <View style={styles.actions}>
         {error && <ErrorText>{error}</ErrorText>}
@@ -168,11 +181,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  headerBrand: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerLogo: {
+    width: 28,
+    height: 28,
+    borderRadius: 7,
+  },
   wordmark: {
     fontFamily: fonts.display,
     fontSize: 20,
     color: colors.ink,
     letterSpacing: -0.3,
+  },
+  // Same treatment as the web dashboard banner: artwork on its own paper
+  // color inside a hairline-bordered card. Idle screen only.
+  heroBand: {
+    backgroundColor: colors.paper,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  heroImage: {
+    width: '100%',
+    aspectRatio: 1408 / 768,
   },
   statusPill: {
     flexDirection: 'row',
