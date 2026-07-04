@@ -8,8 +8,8 @@ export function Button({
   const base =
     'inline-flex h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition-colors duration-200 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-50'
   const variants = {
-    primary: 'bg-accent text-surface hover:bg-accent-deep',
-    ghost: 'border border-line text-ink hover:border-ink-faint hover:bg-panel-2',
+    primary: 'bg-ink text-white hover:bg-ink/85',
+    ghost: 'border border-line bg-panel text-ink hover:border-ink-faint hover:bg-panel-2',
     danger: 'text-danger hover:bg-danger/10',
   }
   return <button className={`${base} ${variants[variant]} ${className}`} {...props} />
@@ -21,7 +21,7 @@ export function Input({
 }: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
-      className={`h-11 w-full rounded-lg border border-line bg-panel-2 px-3 text-sm text-ink placeholder:text-ink-faint transition-colors duration-200 focus:border-accent focus:outline-none ${className}`}
+      className={`h-11 w-full rounded-lg border border-line bg-panel px-3 text-sm text-ink placeholder:text-ink-faint transition-colors duration-200 focus:border-accent focus:outline-none ${className}`}
       {...props}
     />
   )
@@ -33,7 +33,27 @@ export function Select({
 }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
-      className={`h-11 w-full rounded-lg border border-line bg-panel-2 px-3 text-sm text-ink transition-colors duration-200 focus:border-accent focus:outline-none ${className}`}
+      className={`h-11 w-full rounded-lg border border-line bg-panel px-3 text-sm text-ink transition-colors duration-200 focus:border-accent focus:outline-none ${className}`}
+      {...props}
+    />
+  )
+}
+
+/** Quick-pick toggle used for effort, duration, and distance presets. */
+export function Chip({
+  selected = false,
+  className = '',
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & { selected?: boolean }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 text-sm font-medium transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+        selected
+          ? 'border-ink bg-ink text-white'
+          : 'border-line bg-panel text-ink-dim hover:border-ink-faint hover:text-ink'
+      } ${className}`}
       {...props}
     />
   )
@@ -54,8 +74,8 @@ export function Field({ label, children, hint }: { label: string; children: Reac
 export function Alert({ kind, children }: { kind: 'error' | 'info'; children: ReactNode }) {
   const styles =
     kind === 'error'
-      ? 'border-danger/30 bg-danger/10 text-danger'
-      : 'border-accent/30 bg-accent/10 text-accent'
+      ? 'border-danger/30 bg-danger/5 text-danger'
+      : 'border-accent/30 bg-accent/5 text-accent-deep'
   return (
     <div
       role={kind === 'error' ? 'alert' : 'status'}

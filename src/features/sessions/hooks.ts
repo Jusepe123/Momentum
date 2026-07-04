@@ -168,7 +168,8 @@ export function useUpdateSession() {
                 reps: s.reps,
               }))
             : [],
-        p_distance_m: draft.sport === 'strength' ? null : draft.distanceM,
+        // omitted for strength → the function's `default null` applies
+        p_distance_m: draft.sport === 'strength' ? undefined : (draft.distanceM ?? undefined),
       })
       if (rpcError) throw rpcError
     },

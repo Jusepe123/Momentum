@@ -1,4 +1,5 @@
 import { NavLink, Navigate, Outlet, useNavigate } from 'react-router-dom'
+import { Logo } from '../../components/brand'
 import { Spinner } from '../../components/ui'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from './AuthProvider'
@@ -31,11 +32,11 @@ export function ProtectedLayout() {
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-line">
-        <nav className="mx-auto flex h-16 max-w-4xl items-center justify-between px-4 sm:px-6">
+      <header className="border-b border-line bg-panel">
+        <nav className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-6">
-            <NavLink to="/" className="font-display text-lg font-bold tracking-tight">
-              Momentum<span className="text-accent">.</span>
+            <NavLink to="/" aria-label="Momentum home">
+              <Logo />
             </NavLink>
             <div className="flex items-center gap-1">
               <NavLink to="/" end className={linkClass}>
@@ -43,6 +44,9 @@ export function ProtectedLayout() {
               </NavLink>
               <NavLink to="/sessions" end className={linkClass}>
                 Sessions
+              </NavLink>
+              <NavLink to="/routines" end className={linkClass}>
+                Routines
               </NavLink>
             </div>
           </div>
@@ -54,7 +58,7 @@ export function ProtectedLayout() {
           </button>
         </nav>
       </header>
-      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+      <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
         <Outlet />
       </main>
     </div>

@@ -12,6 +12,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import { BrandImage } from '../../components/brand'
 import { Alert, Button, Select } from '../../components/ui'
 import { todayLocalISO } from '../../lib/dates'
 import { formatDate, formatMinSec } from '../../lib/format'
@@ -66,10 +67,20 @@ function shortDate(isoDate: string): string {
   return `${m}/${d}`
 }
 
-function Card({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+function Card({
+  title,
+  subtitle,
+  className = '',
+  children,
+}: {
+  title: string
+  subtitle?: string
+  className?: string
+  children: React.ReactNode
+}) {
   return (
-    <section className="rounded-xl border border-line bg-panel p-5">
-      <header className="mb-4">
+    <section className={`rounded-xl border border-line bg-panel p-4 ${className}`}>
+      <header className="mb-3">
         <h2 className="font-display text-base font-semibold">{title}</h2>
         {subtitle && <p className="mt-0.5 text-xs text-ink-dim">{subtitle}</p>}
       </header>
@@ -91,12 +102,12 @@ function RiskCard({ sessions, today }: { sessions: SessionWithDetails[]; today: 
   const zone = result.zone ? zoneMeta[result.zone] : null
 
   return (
-    <section className="rounded-xl border border-line bg-panel p-5">
+    <section className="rounded-xl border border-line bg-panel p-4">
       <h2 className="font-display text-base font-semibold">Injury risk today</h2>
       <p className="mt-0.5 text-xs text-ink-dim">Acute : chronic workload ratio (ACWR)</p>
       {zone && result.ratio !== null ? (
         <>
-          <div className="mt-4 flex items-center gap-3">
+          <div className="mt-3 flex items-center gap-3">
             <span
               aria-hidden
               className="size-4 rounded-full ring-4 ring-inset"
@@ -109,14 +120,14 @@ function RiskCard({ sessions, today }: { sessions: SessionWithDetails[]; today: 
               {zone.label}
             </span>
           </div>
-          <p className="mt-3 text-sm text-ink-dim">{zone.note}</p>
-          <p className="mt-3 text-xs text-ink-faint">
+          <p className="mt-2 text-sm text-ink-dim">{zone.note}</p>
+          <p className="mt-2 text-xs text-ink-faint">
             Acute (7d): {Math.round(result.acute).toLocaleString('en-US')} · Chronic (weekly avg,
             28d): {Math.round(result.chronic).toLocaleString('en-US')}
           </p>
         </>
       ) : (
-        <p className="mt-4 text-sm text-ink-faint">
+        <p className="mt-3 text-sm text-ink-faint">
           Not enough training history yet — the ratio appears once you've logged sessions across a
           few weeks.
         </p>
@@ -151,14 +162,14 @@ function LoadTrendCard({ sessions, today }: { sessions: SessionWithDetails[]; to
 
   return (
     <Card title="Training load" subtitle={`Daily session load, last ${LOAD_WINDOW_DAYS / 7} weeks`}>
-      <div className="h-40">
+      <div className="h-32">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={loads.map((d) => ({ ...d, tooltipLabel: formatDate(d.date) }))}>
             <CartesianGrid vertical={false} stroke={chart.line} />
             <XAxis dataKey="date" {...axisProps} tickFormatter={shortDate} minTickGap={32} />
             <YAxis {...axisProps} width={36} />
             <Tooltip
-              cursor={{ fill: '#ffffff0a' }}
+              cursor={{ fill: '#1a1a180d' }}
               content={<ChartTooltip formatter={(v) => `${Math.round(v)} load`} />}
             />
             <Bar dataKey="load" fill={chart.accent} radius={[3, 3, 0, 0]} maxBarSize={8} />
@@ -166,7 +177,7 @@ function LoadTrendCard({ sessions, today }: { sessions: SessionWithDetails[]; to
         </ResponsiveContainer>
       </div>
 
-      <h3 className="mb-1 mt-6 text-xs font-medium uppercase tracking-wide text-ink-dim">
+      <h3 className="mb-1 mt-4 text-xs font-medium uppercase tracking-wide text-ink-dim">
         ACWR ratio
         {typeof lastRatio === 'number' && (
           <span className="ml-2 normal-case tracking-normal text-ink-faint">
@@ -174,7 +185,7 @@ function LoadTrendCard({ sessions, today }: { sessions: SessionWithDetails[]; to
           </span>
         )}
       </h3>
-      <div className="h-32">
+      <div className="h-24">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={ratios}>
             <CartesianGrid vertical={false} stroke={chart.line} />
@@ -265,7 +276,7 @@ function ProgressChart({
 
   return (
     <>
-      <div className="h-44">
+      <div className="h-40">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart>
             <CartesianGrid vertical={false} stroke={chart.line} />
@@ -462,11 +473,23 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <h1 className="sr-only">Dashboard</h1>
-      <RiskCard sessions={sessions} today={today} />
-      <LoadTrendCard sessions={sessions} today={today} />
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-3 lg:grid-cols-3">
+        <div className="flex flex-col gap-3">
+          <RiskCard sessions={sessions} today={today} />
+          {/* Optional artwork: drop public/brand/dashboard-hero.png and reload. */}
+          <BrandImage
+            src="/brand/dashboard-hero.png"
+            alt=""
+            className="min-h-0 w-full flex-1 rounded-xl border border-line object-cover"
+          />
+        </div>
+        <div className="lg:col-span-2">
+          <LoadTrendCard sessions={sessions} today={today} />
+        </div>
+      </div>
+      <div className="grid gap-3 lg:grid-cols-2">
         <StrengthProgressCard sessions={sessions} />
         <PaceCard sessions={sessions} />
       </div>

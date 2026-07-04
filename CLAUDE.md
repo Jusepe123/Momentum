@@ -25,26 +25,27 @@ Three layers, strictly ordered; dependencies only point downward:
 
 1. **Pure math — `src/lib/scoring/`**: `sessionLoad`, `estimate1RM` (Epley + Brzycki, reps capped at 36), `riegelPredict`, pace helpers, `acwr` (7-day acute / 28-day chronic windows, both inclusive of `asOf`), `detectPlateau`, `detectPR`, `fitTrend`/`projectMetric` (projections need ≥4 points spanning ≥14 days). No I/O. **Test-first is the norm here** — every function has co-located `*.test.ts`; expected values in tests are computed with `node -e`, never by hand. Date math goes through `epochDay()` (`src/lib/scoring/dates.ts`); rolling-window off-by-ones are the classic bug, so boundary cases are always tested explicitly.
 2. **Data — `src/features/*/hooks.ts` + `src/lib/supabase.ts`**: typed Supabase client (`Database` types generated from the live schema into `src/lib/database.types.ts` — regenerate via MCP `generate_typescript_types` after every migration). React Query throughout; the auth listener in `src/features/auth/AuthProvider.tsx` clears the query cache on sign-out/user-switch (cross-account leak guard — keep it).
-3. **UI — `src/features/{auth,sessions,dashboard}/`**: pages + `src/components/ui.tsx` primitives. Dashboard chart data comes from pure, tested selectors (`src/features/dashboard/selectors.ts`), never computed inline in components.
+3. **UI — `src/features/{auth,sessions,dashboard,routines}/`**: pages + `src/components/ui.tsx` primitives (incl. `Chip` for quick-pick selectors). Dashboard chart data comes from pure, tested selectors (`src/features/dashboard/selectors.ts`), never computed inline in components. The log form has no raw RPE slider: effort is four labeled chips (Easy/Moderate/Hard/Max effort → rpe 3/5/7/9) and duration is preset chips + custom — both still persist `rpe`/`duration_min`, which the ACWR load model requires for every sport.
 
 ## Database (Supabase)
 
-Schema: `sessions` (with `unified_load` as a **generated column**), `strength_sets`, `cardio_details` (1:1, run/swim), `exercises` (rows with `user_id NULL` are global seeds). Migrations live in `supabase/migrations/` and are applied with MCP `apply_migration` — keep the local file and the applied migration identical.
+Schema: `sessions` (with `unified_load` as a **generated column**), `strength_sets`, `cardio_details` (1:1, run/swim), `exercises` (rows with `user_id NULL` are global seeds), `routines` + `routine_sets` (strength templates; `weight_kg` nullable target). Migrations live in `supabase/migrations/` and are applied with MCP `apply_migration` — keep the local file and the applied migration identical.
 
 Non-negotiable invariants (each one broke or nearly broke something already):
 
 - **Never write `unified_load`** — it's generated; Postgres rejects the insert.
 - **Sessions store the user's local calendar date** — use `todayLocalISO()` (`src/lib/dates.ts`), never `toISOString()`, or ACWR day buckets shift near midnight.
 - **Fetch sessions + details in one query** (`SESSION_SELECT` embedded-resource string in `src/features/sessions/hooks.ts`) — no per-session round trips.
-- **Session detail edits go through the `replace_session_details` RPC** (migration 0002), which is transactional and branches on the session's sport. Don't reintroduce client-side delete-then-insert.
+- **Session detail edits go through the `replace_session_details` RPC** (migration 0002), which is transactional and branches on the session's sport. Don't reintroduce client-side delete-then-insert. Routine set edits likewise go through `replace_routine_sets` (migration 0003), which also validates every `exercise_id` is global or caller-owned (FK checks bypass RLS).
 - RLS on every table uses `(select auth.uid())`; child tables derive ownership from the parent session; `anon` has zero grants. Triggers enforce sport/detail consistency and freeze a session's sport once details exist.
 - Any schema change: run the `database-reviewer` agent on the migration file **before** applying it (this has caught CRITICAL issues twice), then check `get_advisors` after applying.
 
 ## Design system
 
-Dark-only. Tokens in `src/index.css`: surface/panel/ink neutrals + one amber accent (`--color-accent`), Inter for text, Space Grotesk (`font-display`) for headings and numerals. Charts: shared theme in `src/features/dashboard/chartTheme.ts`; no dual-axis charts (stack two x-aligned charts instead); risk zones always render a text label alongside the color, never color alone.
+Light editorial minimal. Tokens in `src/index.css` `@theme`: warm off-white page (`--color-surface`), white cards (`panel`) with hairline borders (`line`), near-black ink text, one amber accent (`--color-accent`, use sparingly — data/brand only; primary buttons are ink, not amber), plus per-sport identity hues `--color-sport-{strength,run,swim}` (amber/teal/blue — CVD-checked; class maps in `src/components/sportColors.ts`, pictogram SVGs in `src/components/sportIcons.tsx`). Inter for text, Space Grotesk (`font-display`) for headings and numerals. Charts: shared theme in `src/features/dashboard/chartTheme.ts`; no dual-axis charts (stack two x-aligned charts instead); risk zones always render a text label alongside the color, never color alone.
+
+Brand assets are drop-in overrides (see `public/brand/README.md`): `src/components/brand.tsx` tries `/brand/logo.png` (falls back to an inline SVG mark) and `/brand/dashboard-hero.png` (renders nothing if absent) — the user drops PNGs there, no code change.
 
 ## Notes
 
 - The user may have `[demo]`-tagged seed sessions in the dev database (identifiable via `notes like '[demo]%'`); delete only those when asked to clean up demo data.
-- A UI redesign is planned from files the user will drop into `design/` — treat it as a reskin: presentation only, logic/data/a11y intact.

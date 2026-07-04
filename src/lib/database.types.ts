@@ -60,6 +60,69 @@ export type Database = {
         }
         Relationships: []
       }
+      routine_sets: {
+        Row: {
+          exercise_id: string
+          id: string
+          reps: number
+          routine_id: string
+          set_order: number
+          weight_kg: number | null
+        }
+        Insert: {
+          exercise_id: string
+          id?: string
+          reps: number
+          routine_id: string
+          set_order?: number
+          weight_kg?: number | null
+        }
+        Update: {
+          exercise_id?: string
+          id?: string
+          reps?: number
+          routine_id?: string
+          set_order?: number
+          weight_kg?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "routine_sets_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "routine_sets_routine_id_fkey"
+            columns: ["routine_id"]
+            isOneToOne: false
+            referencedRelation: "routines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      routines: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       sessions: {
         Row: {
           created_at: string
@@ -143,12 +206,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      replace_routine_sets: {
+        Args: { p_routine_id: string; p_sets?: Json }
+        Returns: undefined
+      }
       replace_session_details: {
-        Args: {
-          p_session_id: string
-          p_sets?: Json
-          p_distance_m?: number | null
-        }
+        Args: { p_distance_m?: number; p_session_id: string; p_sets?: Json }
         Returns: undefined
       }
     }

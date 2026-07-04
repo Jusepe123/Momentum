@@ -1,7 +1,12 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { Alert, Button, Field, Input, Select, Spinner } from '../../components/ui'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Alert, Button, Chip, Field, Input, Select, Spinner } from '../../components/ui'
+import { sportColorClass } from '../../components/sportColors'
+import { SportIcon } from '../../components/sportIcons'
 import { todayLocalISO } from '../../lib/dates'
+import { formatMinSec } from '../../lib/format'
+import { paceSecPer100m, paceSecPerKm } from '../../lib/scoring'
+import { useRoutines, type RoutineWithSets } from '../routines/hooks'
 import {
   useCreateExercise,
   useCreateSession,
@@ -22,18 +27,22 @@ interface SetRow {
 
 let nextKey = 0
 
-const RPE_HINTS: Record<number, string> = {
-  0: 'rest',
-  1: 'very easy',
-  2: 'easy',
-  3: 'moderate',
-  4: 'somewhat hard',
-  5: 'hard',
-  6: 'hard+',
-  7: 'very hard',
-  8: 'very hard+',
-  9: 'near maximal',
-  10: 'maximal',
+/**
+ * Effort is stored as RPE (0-10) in the DB, but picked from four
+ * plain-language levels — a slider over an ambiguous scale helps nobody.
+ */
+const EFFORT_LEVELS = [
+  { rpe: 3, label: 'Easy', hint: 'could do lots more' },
+  { rpe: 5, label: 'Moderate', hint: 'breathing harder' },
+  { rpe: 7, label: 'Hard', hint: 'a few reps in the tank' },
+  { rpe: 9, label: 'Max effort', hint: 'nothing left' },
+] as const
+
+const DURATION_PRESETS = [30, 45, 60, 90] as const
+
+const DISTANCE_PRESETS: Record<'run' | 'swim', number[]> = {
+  run: [5, 10, 21.1], // km
+  swim: [500, 1000, 1500, 2000], // m
 }
 
 function draftFromSession(s: SessionWithDetails): {
@@ -87,6 +96,7 @@ export function SessionFormPage() {
 function SessionForm({ existing }: { existing?: SessionWithDetails }) {
   const navigate = useNavigate()
   const { data: exercises } = useExercises()
+  const { data: routines } = useRoutines()
   const createSession = useCreateSession()
   const updateSession = useUpdateSession()
   const createExercise = useCreateExercise()
@@ -99,7 +109,7 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
             sport: 'strength' as Sport,
             date: todayLocalISO(),
             duration: '',
-            rpe: 7,
+            rpe: null as number | null,
             notes: '',
             sets: [] as SetRow[],
             distance: '',
@@ -110,15 +120,31 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
   const [sport, setSport] = useState<Sport>(initial.sport)
   const [date, setDate] = useState(initial.date)
   const [duration, setDuration] = useState(initial.duration)
-  const [rpe, setRpe] = useState(initial.rpe)
+  const [customDuration, setCustomDuration] = useState(
+    initial.duration !== '' && !DURATION_PRESETS.some((p) => String(p) === initial.duration),
+  )
+  const [rpe, setRpe] = useState<number | null>(initial.rpe)
   const [notes, setNotes] = useState(initial.notes)
   const [sets, setSets] = useState<SetRow[]>(initial.sets)
   const [distance, setDistance] = useState(initial.distance)
+  const [appliedRoutineId, setAppliedRoutineId] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
 
   const isEdit = !!existing
   const busy = createSession.isPending || updateSession.isPending
   const meta = sportMeta[sport]
+
+  // Live pace preview while duration + distance are both valid.
+  const pacePreview = useMemo(() => {
+    if (!meta.distanceUnit) return null
+    const mins = Number(duration)
+    const raw = Number(distance)
+    if (!Number.isFinite(mins) || mins <= 0 || !Number.isFinite(raw) || raw <= 0) return null
+    const metres = meta.distanceUnit === 'km' ? raw * 1000 : raw
+    return sport === 'run'
+      ? `${formatMinSec(paceSecPerKm(mins * 60, metres))} /km`
+      : `${formatMinSec(paceSecPer100m(mins * 60, metres))} /100m`
+  }, [meta.distanceUnit, sport, duration, distance])
 
   function addSet() {
     const prev = sets[sets.length - 1]
@@ -131,6 +157,21 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
         reps: prev?.reps ?? '',
       },
     ])
+  }
+
+  function applyRoutine(routine: RoutineWithSets) {
+    setSets(
+      routine.routine_sets
+        .slice()
+        .sort((a, b) => a.set_order - b.set_order)
+        .map((rs) => ({
+          key: nextKey++,
+          exerciseId: rs.exercise_id,
+          weightKg: rs.weight_kg == null ? '' : String(rs.weight_kg),
+          reps: String(rs.reps),
+        })),
+    )
+    setAppliedRoutineId(routine.id)
   }
 
   function updateSet(key: number, patch: Partial<SetRow>) {
@@ -154,7 +195,12 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
 
     const durationMin = Number(duration)
     if (!Number.isFinite(durationMin) || durationMin <= 0 || durationMin > 1440) {
-      setFormError('Duration must be between 1 and 1440 minutes.')
+      setFormError('Pick a session length (or enter one between 1 and 1440 minutes).')
+      return
+    }
+
+    if (rpe === null) {
+      setFormError('Pick an effort level.')
       return
     }
 
@@ -212,6 +258,8 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
     }
   }
 
+  const effortMatchesLevel = rpe !== null && EFFORT_LEVELS.some((l) => l.rpe === rpe)
+
   return (
     <section className="mx-auto max-w-xl">
       <header className="mb-6">
@@ -219,12 +267,12 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
           {isEdit ? 'Edit session' : 'Log session'}
         </h1>
         <p className="mt-1 text-sm text-ink-dim">
-          RPE × minutes gives every sport the same load scale.
+          Effort × minutes gives every sport the same load scale.
         </p>
       </header>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
-        <div role="tablist" className="grid grid-cols-3 gap-1 rounded-lg bg-panel-2 p-1">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div role="tablist" className="grid grid-cols-3 gap-2">
           {SPORTS.map((s) => (
             <button
               key={s}
@@ -233,11 +281,14 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
               aria-selected={sport === s}
               disabled={isEdit && s !== sport}
               onClick={() => setSport(s)}
-              className={`h-10 rounded-md text-sm font-medium transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-40 ${
-                sport === s ? 'bg-panel text-ink' : 'text-ink-dim hover:text-ink'
+              className={`flex h-20 flex-col items-center justify-center gap-1.5 rounded-xl border text-sm font-medium transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-40 ${
+                sport === s
+                  ? `border-ink bg-panel ${sportColorClass[s]}`
+                  : 'border-line bg-panel text-ink-faint hover:border-ink-faint hover:text-ink-dim'
               }`}
             >
-              {sportMeta[s].label}
+              <SportIcon sport={s} className="size-8" />
+              <span className={sport === s ? 'text-ink' : ''}>{sportMeta[s].label}</span>
             </button>
           ))}
         </div>
@@ -257,45 +308,103 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
               onChange={(e) => setDate(e.target.value)}
             />
           </Field>
-          <Field label="Duration" hint="minutes">
-            <Input
-              type="number"
-              required
-              min={1}
-              max={1440}
-              step="1"
-              inputMode="numeric"
-              placeholder="60"
-              value={duration}
-              onChange={(e) => setDuration(e.target.value)}
-            />
-          </Field>
         </div>
 
-        <Field label={`Effort (RPE) — ${rpe}`} hint={RPE_HINTS[Math.round(rpe)]}>
-          <input
-            type="range"
-            min={0}
-            max={10}
-            step={0.5}
-            value={rpe}
-            onChange={(e) => setRpe(Number(e.target.value))}
-            className="h-11 w-full accent-accent"
-          />
+        <Field label="Session length" hint="minutes — feeds your injury-risk load">
+          <div className="flex flex-wrap items-center gap-2">
+            {DURATION_PRESETS.map((p) => (
+              <Chip
+                key={p}
+                selected={!customDuration && duration === String(p)}
+                onClick={() => {
+                  setDuration(String(p))
+                  setCustomDuration(false)
+                }}
+                className="w-14"
+              >
+                {p}
+              </Chip>
+            ))}
+            <Chip
+              selected={customDuration}
+              onClick={() => {
+                setCustomDuration(true)
+                setDuration('')
+              }}
+            >
+              Custom
+            </Chip>
+            {customDuration && (
+              <Input
+                type="number"
+                aria-label="Duration in minutes"
+                min={1}
+                max={1440}
+                step="1"
+                inputMode="numeric"
+                placeholder="75"
+                autoFocus
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+                className="!h-10 w-24"
+              />
+            )}
+          </div>
+        </Field>
+
+        <Field label="Effort" hint="how hard the whole session felt">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {EFFORT_LEVELS.map((level) => (
+              <Chip
+                key={level.rpe}
+                selected={rpe === level.rpe}
+                onClick={() => setRpe(level.rpe)}
+                className="flex-col !items-start px-3 py-2 text-left"
+              >
+                <span className="text-sm font-semibold">{level.label}</span>
+                <span
+                  className={`text-[11px] font-normal ${
+                    rpe === level.rpe ? 'text-white/70' : 'text-ink-faint'
+                  }`}
+                >
+                  {level.hint}
+                </span>
+              </Chip>
+            ))}
+          </div>
+          {isEdit && rpe !== null && !effortMatchesLevel && (
+            <p className="mt-1.5 text-xs text-ink-faint">
+              Saved effort is {rpe}/10 — pick a level above to change it.
+            </p>
+          )}
         </Field>
 
         {meta.distanceUnit && (
-          <Field label="Distance" hint={meta.distanceUnit}>
-            <Input
-              type="number"
-              required
-              min={meta.distanceUnit === 'km' ? 0.1 : 25}
-              step="any"
-              inputMode="decimal"
-              placeholder={meta.distanceUnit === 'km' ? '8.5' : '1500'}
-              value={distance}
-              onChange={(e) => setDistance(e.target.value)}
-            />
+          <Field label="Distance" hint={pacePreview ? `pace ${pacePreview}` : meta.distanceUnit}>
+            <div className="flex flex-wrap items-center gap-2">
+              {DISTANCE_PRESETS[sport as 'run' | 'swim'].map((p) => (
+                <Chip
+                  key={p}
+                  selected={distance === String(p)}
+                  onClick={() => setDistance(String(p))}
+                >
+                  {p}
+                  {meta.distanceUnit === 'km' ? ' km' : ' m'}
+                </Chip>
+              ))}
+              <Input
+                type="number"
+                aria-label={`Distance in ${meta.distanceUnit === 'km' ? 'kilometres' : 'metres'}`}
+                required
+                min={meta.distanceUnit === 'km' ? 0.1 : 25}
+                step="any"
+                inputMode="decimal"
+                placeholder={meta.distanceUnit === 'km' ? '8.5' : '1500'}
+                value={distance}
+                onChange={(e) => setDistance(e.target.value)}
+                className="!h-10 w-28"
+              />
+            </div>
           </Field>
         )}
 
@@ -304,9 +413,36 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
             <legend className="mb-1.5 text-xs font-medium uppercase tracking-wide text-ink-dim">
               Sets
             </legend>
+
+            {routines && routines.length > 0 && (
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <span className="text-xs text-ink-faint">Start from:</span>
+                {routines.map((r) => (
+                  <Chip
+                    key={r.id}
+                    selected={appliedRoutineId === r.id}
+                    onClick={() => applyRoutine(r)}
+                    className="!min-h-8 px-2.5 text-xs"
+                  >
+                    {r.name}
+                  </Chip>
+                ))}
+              </div>
+            )}
+
             {sets.length === 0 && (
-              <p className="rounded-lg border border-dashed border-line px-4 py-6 text-center text-sm text-ink-faint">
+              <p className="rounded-lg border border-dashed border-line bg-panel px-4 py-6 text-center text-sm text-ink-faint">
                 No sets yet. Sets power your 1RM progress tracking.
+                {(!routines || routines.length === 0) && (
+                  <>
+                    {' '}
+                    Tip: save your usual workout as a{' '}
+                    <Link to="/routines" className="underline hover:text-ink">
+                      routine
+                    </Link>{' '}
+                    and prefill it next time.
+                  </>
+                )}
               </p>
             )}
             <div className="space-y-2">
@@ -382,7 +518,7 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="How did it feel?"
-            className="w-full rounded-lg border border-line bg-panel-2 px-3 py-2.5 text-sm text-ink placeholder:text-ink-faint transition-colors duration-200 focus:border-accent focus:outline-none"
+            className="w-full rounded-lg border border-line bg-panel px-3 py-2.5 text-sm text-ink placeholder:text-ink-faint transition-colors duration-200 focus:border-accent focus:outline-none"
           />
         </Field>
 

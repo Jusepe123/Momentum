@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
+import { LogoMark } from '../../components/brand'
 import { Alert, Button, Field, Input, Spinner } from '../../components/ui'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from './AuthProvider'
@@ -41,6 +42,7 @@ export function LoginPage() {
     <main className="flex min-h-screen items-center justify-center p-6">
       <div className="w-full max-w-sm">
         <header className="mb-10 text-center">
+          <LogoMark className="mx-auto mb-4 size-16" />
           <h1 className="font-display text-4xl font-bold tracking-tight">
             Momentum<span className="text-accent">.</span>
           </h1>
@@ -62,7 +64,7 @@ export function LoginPage() {
                   setNotice(null)
                 }}
                 className={`h-9 rounded-md text-sm font-medium transition-colors duration-200 ${
-                  mode === m ? 'bg-panel text-ink' : 'text-ink-dim hover:text-ink'
+                  mode === m ? 'bg-panel text-ink shadow-sm' : 'text-ink-dim hover:text-ink'
                 }`}
               >
                 {m === 'login' ? 'Log in' : 'Sign up'}

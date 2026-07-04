@@ -6,25 +6,30 @@
   --font-sans: "Inter Variable", system-ui, sans-serif;
   --font-display: "Space Grotesk Variable", "Inter Variable", system-ui, sans-serif;
 
-  /* Dark-first palette: deep blue-gray, never pure black. */
-  --color-surface: #0f1115;
-  --color-panel: #16191f;
-  --color-panel-2: #1d212a;
-  --color-line: #262b35;
-  --color-ink: #e7e9ee;
-  --color-ink-dim: #9aa1ad;
-  --color-ink-faint: #6b7280;
+  /* Light editorial palette: warm off-white page, white panels, near-black ink. */
+  --color-surface: #f7f7f5;
+  --color-panel: #ffffff;
+  --color-panel-2: #f3f3f0;
+  --color-line: #e6e5e1;
+  --color-ink: #1a1a18;
+  --color-ink-dim: #6f6e69;
+  --color-ink-faint: #a3a29c;
 
-  /* One accent: amber. Primary actions and key highlights only. */
-  --color-accent: #f5a623;
-  --color-accent-deep: #d98b0f;
+  /* One brand accent: amber. Data marks, highlights, the logo dot. */
+  --color-accent: #d97706;
+  --color-accent-deep: #b45309;
 
-  --color-danger: #f0655a;
-  --color-ok: #4ade80;
+  /* Sport identity hues (pictograms, badges, chips). */
+  --color-sport-strength: #d97706;
+  --color-sport-run: #0d9488;
+  --color-sport-swim: #2563eb;
+
+  --color-danger: #dc2626;
+  --color-ok: #15803d;
 }
 
 html {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
