@@ -27,6 +27,11 @@ const config: ExpoConfig = {
     // service notification (the thing that keeps GPS alive) is visible.
     permissions: ['android.permission.POST_NOTIFICATIONS'],
   },
+  extra: {
+    eas: {
+      projectId: 'bf08221c-6dbf-45af-9167-80fb56b2b2c0',
+    },
+  },
   plugins: [
     [
       'expo-location',
