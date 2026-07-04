@@ -3,6 +3,8 @@ import { Alert, PermissionsAndroid, Platform } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { LOCATION_TASK } from './locationTask'
 import { flushSnapshot, useRunStore } from './store'
+import { dismissRunNotification, updateRunNotification } from './notification'
+import { activeElapsedMs } from '../lib/geo/elapsed'
 import { todayLocalISO } from '../lib/dates'
 import { colors } from '../theme'
 
@@ -45,7 +47,10 @@ export async function startRun(): Promise<StartResult> {
     await Location.startLocationUpdatesAsync(LOCATION_TASK, {
       accuracy: Location.Accuracy.BestForNavigation,
       timeInterval: 3000,
-      distanceInterval: 5,
+      // Time-driven (not movement-driven) so batches keep arriving while
+      // standing still — the jitter gate discards the noise, and the shade
+      // notification's clock keeps ticking at a red light.
+      distanceInterval: 0,
       foregroundService: {
         notificationTitle: 'Momentum — recording run',
         notificationBody: 'Distance and time are being measured.',
@@ -69,10 +74,14 @@ export async function startRun(): Promise<StartResult> {
  *  FGS from the background is unreliable; the store just discards points. */
 export function pauseRun() {
   useRunStore.getState().pause(Date.now())
+  const { distance, segments } = useRunStore.getState()
+  void updateRunNotification('paused', distance.totalM, activeElapsedMs(segments, Date.now()))
 }
 
 export function resumeRun() {
   useRunStore.getState().resume(Date.now())
+  const { distance, segments } = useRunStore.getState()
+  void updateRunNotification('recording', distance.totalM, activeElapsedMs(segments, Date.now()))
 }
 
 export async function finishRun() {
@@ -80,6 +89,7 @@ export async function finishRun() {
   // Make sure 'finished' is on disk before anything else can kill the app.
   await flushSnapshot()
   await stopTracking()
+  await dismissRunNotification()
 }
 
 export async function stopTracking() {
@@ -98,6 +108,7 @@ export async function reconcileOnLaunch() {
   const { status } = useRunStore.getState()
   if (status === 'idle' || status === 'finished') {
     await stopTracking()
+    await dismissRunNotification()
   }
 }
 

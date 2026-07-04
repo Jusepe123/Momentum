@@ -1,7 +1,20 @@
 import * as TaskManager from 'expo-task-manager'
 import type { LocationObject } from 'expo-location'
+import * as Notifications from 'expo-notifications'
 import { useRunStore } from './store'
+import { updateRunNotification } from './notification'
+import { activeElapsedMs } from '../lib/geo/elapsed'
 import type { GeoPoint } from '../lib/geo/distance'
+
+// Show our run-progress notification in the shade even while the app is
+// foregrounded (module scope: headless launches get it too).
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: false,
+    shouldSetBadge: false,
+  }),
+})
 
 /**
  * Background location task. MUST be defined at module scope and imported from
@@ -33,4 +46,11 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
     timestamp: l.timestamp,
   }))
   useRunStore.getState().ingest(points)
+
+  // Keep the shade notification live (works with the screen off — this task
+  // runs in background/headless JS). Paused updates happen in recorder.ts.
+  const { status, distance, segments } = useRunStore.getState()
+  if (status === 'recording') {
+    await updateRunNotification('recording', distance.totalM, activeElapsedMs(segments, Date.now()))
+  }
 })

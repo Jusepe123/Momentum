@@ -33,6 +33,7 @@ const config: ExpoConfig = {
     },
   },
   plugins: [
+    ['expo-notifications', { color: '#0d9488' }],
     [
       'expo-location',
       {
