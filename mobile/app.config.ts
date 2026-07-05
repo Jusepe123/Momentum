@@ -12,6 +12,18 @@ const config: ExpoConfig = {
   icon: './assets/icon.png',
   userInterfaceStyle: 'light',
   newArchEnabled: true,
+  // EAS Update (OTA): ship JS/asset changes without a store/APK rebuild.
+  // runtimeVersion ties an update to a compatible native build — bump it (via
+  // the app version) only when native code changes; pure-JS changes keep the
+  // same runtime and reach every installed build on the channel.
+  runtimeVersion: { policy: 'appVersion' },
+  updates: {
+    url: 'https://u.expo.dev/bf08221c-6dbf-45af-9167-80fb56b2b2c0',
+    // Never block startup on the network — check in the background and apply the
+    // downloaded update on the NEXT launch. (This app has a history of
+    // startup-gate white screens; keep launch instant.)
+    fallbackToCacheTimeout: 0,
+  },
   android: {
     package: 'com.jusepe.momentum',
     adaptiveIcon: {

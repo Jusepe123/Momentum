@@ -18,7 +18,7 @@ export async function uploadRun(run: PendingRun): Promise<void> {
   const { error } = await supabase.from('sessions').insert({
     id: run.id,
     user_id: auth.user.id,
-    sport: 'run',
+    sport: run.sport,
     date: run.dateLocal,
     duration_min: Math.max(1, Math.round(run.activeMs / 60000)),
     rpe: run.rpe,

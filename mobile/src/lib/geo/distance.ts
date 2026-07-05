@@ -24,10 +24,27 @@ export interface FilterConfig {
   maxSpeedMps: number
 }
 
-export const DEFAULT_FILTER: FilterConfig = {
+/** Running filter: the teleport gate is ~2:00 min/km — nobody runs faster. */
+export const RUN_FILTER: FilterConfig = {
   maxAccuracyM: 25,
   minDisplacementM: 5,
   maxSpeedMps: 12.5, // ~2:00 min/km pace — nobody runs faster
+}
+
+/** Cycling filter: same accuracy/jitter gates, but a much higher teleport gate
+ *  (~90 km/h) — cyclists descend far faster than 12.5 m/s and the run cap would
+ *  wrongly discard legitimate fast fixes. */
+export const BIKE_FILTER: FilterConfig = {
+  maxAccuracyM: 25,
+  minDisplacementM: 5,
+  maxSpeedMps: 25, // ~90 km/h — descents are real
+}
+
+/** Backward-compat alias; the default matches running behavior. */
+export const DEFAULT_FILTER: FilterConfig = RUN_FILTER
+
+export function filterForSport(sport: 'run' | 'bike'): FilterConfig {
+  return sport === 'bike' ? BIKE_FILTER : RUN_FILTER
 }
 
 export interface DistanceState {

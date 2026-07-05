@@ -7,6 +7,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
  */
 export interface PendingRun {
   id: string
+  /** which cardio discipline this session records (drives sessions.sport) */
+  sport: 'run' | 'bike'
   /** local calendar date captured at run START (ACWR bucket invariant) */
   dateLocal: string
   activeMs: number
@@ -23,7 +25,9 @@ export async function listPending(): Promise<PendingRun[]> {
     const raw = await AsyncStorage.getItem(KEY)
     if (!raw) return []
     const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? (parsed as PendingRun[]) : []
+    if (!Array.isArray(parsed)) return []
+    // Runs queued before the bike release predate `sport`; default them to run.
+    return (parsed as PendingRun[]).map((r) => ({ ...r, sport: r.sport ?? 'run' }))
   } catch {
     return []
   }

@@ -2,11 +2,11 @@ import * as Location from 'expo-location'
 import { Alert, PermissionsAndroid, Platform } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { LOCATION_TASK } from './locationTask'
-import { flushSnapshot, useRunStore } from './store'
+import { flushSnapshot, useRunStore, type RecorderSport } from './store'
 import { dismissRunNotification, updateRunNotification } from './notification'
 import { activeElapsedMs } from '../lib/geo/elapsed'
 import { todayLocalISO } from '../lib/dates'
-import { colors } from '../theme'
+import { sportColor } from '../theme'
 
 export type StartResult = { ok: true } | { ok: false; message: string }
 
@@ -15,20 +15,21 @@ const BATTERY_PROMPT_KEY = 'battery_prompt_shown'
 /**
  * Full start flow, called from the Start button press (app is guaranteed
  * foregrounded — starting a foreground service from the background is the
- * classic Android 12+ failure).
+ * classic Android 12+ failure). `sport` selects the distance filter, the
+ * notification copy and the FGS colour.
  */
-export async function startRun(): Promise<StartResult> {
+export async function startRecording(sport: RecorderSport): Promise<StartResult> {
+  const noun = sport === 'bike' ? 'ride' : 'run'
   const fg = await Location.requestForegroundPermissionsAsync()
   if (!fg.granted) {
-    return { ok: false, message: 'Momentum needs location access to measure your run.' }
+    return { ok: false, message: `Momentum needs location access to measure your ${noun}.` }
   }
 
   const bg = await Location.requestBackgroundPermissionsAsync()
   if (!bg.granted) {
     return {
       ok: false,
-      message:
-        'Choose “Allow all the time” in the location permission so the run keeps recording while the screen is off.',
+      message: `Choose “Allow all the time” in the location permission so the ${noun} keeps recording while the screen is off.`,
     }
   }
 
@@ -40,7 +41,7 @@ export async function startRun(): Promise<StartResult> {
   }
 
   // Start the store BEFORE the updates so the first GPS batch isn't discarded.
-  useRunStore.getState().start(todayLocalISO(), Date.now())
+  useRunStore.getState().start(sport, todayLocalISO(), Date.now())
   await flushSnapshot()
 
   try {
@@ -52,9 +53,9 @@ export async function startRun(): Promise<StartResult> {
       // notification's clock keeps ticking at a red light.
       distanceInterval: 0,
       foregroundService: {
-        notificationTitle: 'Momentum — recording run',
+        notificationTitle: `Momentum — recording ${noun}`,
         notificationBody: 'Distance and time are being measured.',
-        notificationColor: colors.run,
+        notificationColor: sportColor[sport],
         killServiceOnDestroy: false,
       },
     })
@@ -70,18 +71,45 @@ export async function startRun(): Promise<StartResult> {
   return { ok: true }
 }
 
+/** Back-compat wrapper for the run recorder. */
+export function startRun(): Promise<StartResult> {
+  return startRecording('run')
+}
+
 /** Pause leaves the GPS/foreground service running on purpose — restarting an
  *  FGS from the background is unreliable; the store just discards points. */
 export function pauseRun() {
   useRunStore.getState().pause(Date.now())
-  const { distance, segments } = useRunStore.getState()
-  void updateRunNotification('paused', distance.totalM, activeElapsedMs(segments, Date.now()))
+  const { distance, segments, sport } = useRunStore.getState()
+  void updateRunNotification('paused', distance.totalM, activeElapsedMs(segments, Date.now()), sport)
 }
 
 export function resumeRun() {
   useRunStore.getState().resume(Date.now())
-  const { distance, segments } = useRunStore.getState()
-  void updateRunNotification('recording', distance.totalM, activeElapsedMs(segments, Date.now()))
+  const { distance, segments, sport } = useRunStore.getState()
+  void updateRunNotification(
+    'recording',
+    distance.totalM,
+    activeElapsedMs(segments, Date.now()),
+    sport,
+  )
+}
+
+/**
+ * Re-post the shade notification with the current elapsed time. Used when the
+ * app returns to the foreground: the notification is otherwise only refreshed
+ * on GPS batches (timeInterval), so a freshly-woken screen would show a clock
+ * up to one batch stale. Cheap and idempotent — no-op when not recording.
+ */
+export function refreshRunNotification() {
+  const { status, distance, segments, sport } = useRunStore.getState()
+  if (status !== 'recording' && status !== 'paused') return
+  void updateRunNotification(
+    status,
+    distance.totalM,
+    activeElapsedMs(segments, Date.now()),
+    sport,
+  )
 }
 
 export async function finishRun() {

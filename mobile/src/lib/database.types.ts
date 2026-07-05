@@ -60,6 +60,24 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       routine_sets: {
         Row: {
           exercise_id: string
@@ -216,7 +234,7 @@ export type Database = {
       }
     }
     Enums: {
-      sport: "strength" | "run" | "swim"
+      sport: "strength" | "run" | "bike"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -344,7 +362,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      sport: ["strength", "run", "swim"],
+      sport: ["strength", "run", "bike"],
     },
   },
 } as const

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatElapsed, formatKm, formatPace } from './format'
+import { formatElapsed, formatKm, formatPace, formatSpeedKmH } from './format'
 
 describe('formatKm', () => {
   it('renders metres as km with 2 decimals', () => {
@@ -34,5 +34,20 @@ describe('formatPace', () => {
     expect(formatPace(1500000, 5000)).toBe('5:00')
     // node -e: 330000 ms over 1000 m → 5.5 min → 5:30
     expect(formatPace(330000, 1000)).toBe('5:30')
+  })
+})
+
+describe('formatSpeedKmH', () => {
+  it('withholds speed until 100 m and 30 s (same guards as pace)', () => {
+    expect(formatSpeedKmH(60000, 99)).toBe('—')
+    expect(formatSpeedKmH(29000, 500)).toBe('—')
+  })
+  it('computes average km/h to 1 decimal', () => {
+    // node -e: 10000 m in 3600000 ms (1 h) → 10.0 km/h
+    expect(formatSpeedKmH(3600000, 10000)).toBe('10.0')
+    // node -e: 15000 m in 1800000 ms (0.5 h) → 30.0 km/h
+    expect(formatSpeedKmH(1800000, 15000)).toBe('30.0')
+    // node -e: 4000 m in 900000 ms (15 min) → 16.0 km/h
+    expect(formatSpeedKmH(900000, 4000)).toBe('16.0')
   })
 })

@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
   advance,
+  BIKE_FILTER,
   DEFAULT_FILTER,
+  filterForSport,
   haversineM,
   initialDistanceState,
   resetAnchor,
+  RUN_FILTER,
   type DistanceState,
+  type FilterConfig,
   type GeoPoint,
 } from './distance'
 
@@ -102,6 +106,48 @@ describe('advance', () => {
       if (i % 4 === 2) dirty.push(pt(i * 10, p.timestamp + 1000, 80, 300))
     })
     expect(feed(dirty).totalM).toBeCloseTo(feed(clean).totalM, 6)
+  })
+})
+
+function feedWith(cfg: FilterConfig, points: GeoPoint[]): DistanceState {
+  return points.reduce((s, p) => advance(s, p, cfg), initialDistanceState)
+}
+
+describe('sport filters (run vs bike teleport gate)', () => {
+  it('DEFAULT_FILTER is the run filter', () => {
+    expect(DEFAULT_FILTER).toBe(RUN_FILTER)
+  })
+
+  it('filterForSport maps sport → config', () => {
+    expect(filterForSport('run')).toBe(RUN_FILTER)
+    expect(filterForSport('bike')).toBe(BIKE_FILTER)
+  })
+
+  it('accepts a ~20 m/s fix on the bike but re-anchors it on the run', () => {
+    // 60 m in 3 s = 20 m/s: above the 12.5 m/s run gate, below the 25 m/s bike
+    // gate (node -e: haversine(60 m) = 60).
+    const points = [pt(0, 0), pt(60, 3000)]
+    expect(feedWith(BIKE_FILTER, points).totalM).toBeCloseTo(60, 6) // accepted
+    expect(feedWith(RUN_FILTER, points).totalM).toBe(0) // teleport → adds 0
+  })
+
+  it('bike keeps measuring from the new anchor after a fast fix run would drop', () => {
+    // Same fast fix, then a slow legit step. On the bike both add; on the run
+    // the first re-anchors (0) and only the second-relative step could count.
+    const s1Bike = feedWith(BIKE_FILTER, [pt(0, 0), pt(60, 3000)])
+    const s2Bike = advance(s1Bike, pt(70, 6000), BIKE_FILTER)
+    expect(s2Bike.totalM).toBeCloseTo(70, 6) // 60 + 10
+
+    const s1Run = feedWith(RUN_FILTER, [pt(0, 0), pt(60, 3000)])
+    const s2Run = advance(s1Run, pt(70, 6000), RUN_FILTER)
+    expect(s2Run.totalM).toBeCloseTo(10, 6) // re-anchored at 60, then +10
+  })
+
+  it('speed exactly at the bike cap accumulates (rule is >cap teleports)', () => {
+    // 50 m in 2 s = 25 m/s == BIKE_FILTER cap (node -e: haversine(50 m) = 50)
+    expect(feedWith(BIKE_FILTER, [pt(0, 0), pt(50, 2000)]).totalM).toBeCloseTo(50, 6)
+    // ...and the same fix is a teleport on the run (25 > 12.5)
+    expect(feedWith(RUN_FILTER, [pt(0, 0), pt(50, 2000)]).totalM).toBe(0)
   })
 })
 

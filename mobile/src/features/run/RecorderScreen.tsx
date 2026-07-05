@@ -1,48 +1,74 @@
 import { useEffect, useState } from 'react'
-import { Image, StyleSheet, Text, View } from 'react-native'
+import { AppState, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useRunStore } from '../../tracking/store'
-import { finishRun, pauseRun, resumeRun, startRun } from '../../tracking/recorder'
+import {
+  finishRun,
+  pauseRun,
+  refreshRunNotification,
+  resumeRun,
+  startRecording,
+} from '../../tracking/recorder'
 import { activeElapsedMs } from '../../lib/geo/elapsed'
-import { formatElapsed, formatKm, formatPace } from '../../lib/format'
-import { supabase } from '../../lib/supabase'
-import { listPending, removePending } from '../../upload/pending'
-import { uploadRun } from '../../upload/uploadRun'
+import { formatElapsed, formatKm, formatPace, formatSpeedKmH } from '../../lib/format'
 import { Button, ErrorText } from '../../components/ui'
-import { HeroBand } from '../../components/HeroBand'
-import { colors, fonts } from '../../theme'
+import { SportIcon } from '../../components/SportIcon'
+import { colors, fonts, sportColor } from '../../theme'
 
-export function RunScreen() {
+type RecorderSport = 'run' | 'bike'
+
+const SPORT_LABEL: Record<RecorderSport, string> = { run: 'Run', bike: 'Ride' }
+
+/**
+ * Sport-aware GPS recorder (run or bike). The Start/Pause/Resume/Finish state
+ * machine is identical across sports; only the identity hue, copy and the
+ * third stat (pace /km for run, speed km/h for bike) change. `onBack` returns
+ * to Home and is only offered while idle — you can't leave a live recording.
+ */
+export function RecorderScreen({
+  sport,
+  onBack,
+}: {
+  sport: RecorderSport
+  onBack?: () => void
+}) {
   const status = useRunStore((s) => s.status)
   const segments = useRunStore((s) => s.segments)
   const distanceM = useRunStore((s) => s.distance.totalM)
   const [error, setError] = useState<string | null>(null)
   const [starting, setStarting] = useState(false)
-  const [pendingCount, setPendingCount] = useState(0)
-  const [syncing, setSyncing] = useState(false)
   const [finishing, setFinishing] = useState(false)
   const [, forceTick] = useState(0)
 
-  // Runs finished earlier but never uploaded (dead network, crash) wait in
-  // the pending queue; surface them whenever the screen is idle.
-  useEffect(() => {
-    if (status !== 'idle') return
-    listPending().then((list) => setPendingCount(list.length))
-  }, [status])
-
   // Re-render twice a second while recording; elapsed time is recomputed from
   // segment timestamps, so nothing drifts and nothing accumulates here.
+  //
+  // The OS pauses JS timers while the screen is off, so on wake the clock would
+  // stay frozen at the last tick until the next interval fires. Snap it forward
+  // the instant the app returns to the foreground — and re-post the shade
+  // notification (otherwise only refreshed on GPS batches) so both are current.
   useEffect(() => {
     if (status !== 'recording') return
     const id = setInterval(() => forceTick((t) => t + 1), 500)
-    return () => clearInterval(id)
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') {
+        forceTick((t) => t + 1)
+        refreshRunNotification()
+      }
+    })
+    return () => {
+      clearInterval(id)
+      sub.remove()
+    }
   }, [status])
 
   const elapsedMs = activeElapsedMs(segments, Date.now())
+  const hue = sportColor[sport]
+  const isIdle = status === 'idle'
 
   async function handleStart() {
     setError(null)
     setStarting(true)
-    const result = await startRun()
+    const result = await startRecording(sport)
     setStarting(false)
     if (!result.ok) setError(result.message)
   }
@@ -56,43 +82,42 @@ export function RunScreen() {
     }
   }
 
-  async function handleSyncPending() {
-    setError(null)
-    setSyncing(true)
-    try {
-      for (const run of await listPending()) {
-        await uploadRun(run)
-        await removePending(run.id)
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Upload failed — try again with signal.')
-    } finally {
-      setPendingCount((await listPending()).length)
-      setSyncing(false)
-    }
-  }
-
   return (
     <View style={styles.root}>
       <View style={styles.header}>
-        <View style={styles.headerBrand}>
-          <Image source={require('../../../assets/brand/logo.png')} style={styles.headerLogo} />
-          <Text style={styles.wordmark}>
-            Momentum<Text style={{ color: colors.accent }}>.</Text>
-          </Text>
+        {isIdle && onBack ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Back to home"
+            onPress={onBack}
+            hitSlop={12}
+            style={styles.backBtn}
+          >
+            <Text style={styles.backChevron}>‹</Text>
+          </Pressable>
+        ) : (
+          <View style={styles.backBtn} />
+        )}
+
+        <View style={[styles.sportBadge, { borderColor: hue }]}>
+          <SportIcon sport={sport} color={hue} size={18} />
+          <Text style={[styles.sportBadgeText, { color: hue }]}>{SPORT_LABEL[sport]}</Text>
         </View>
-        {status !== 'idle' && (
+
+        {status !== 'idle' ? (
           <View style={styles.statusPill}>
             <View
               style={[
                 styles.statusDot,
-                { backgroundColor: status === 'recording' ? colors.run : colors.inkFaint },
+                { backgroundColor: status === 'recording' ? hue : colors.inkFaint },
               ]}
             />
             <Text style={styles.statusText}>
               {status === 'recording' ? 'Recording' : 'Paused'}
             </Text>
           </View>
+        ) : (
+          <View style={styles.backBtn} />
         )}
       </View>
 
@@ -107,29 +132,25 @@ export function RunScreen() {
           </View>
           <View style={styles.statDivider} />
           <View style={styles.stat}>
-            <Text style={styles.statValue}>{formatPace(elapsedMs, distanceM)}</Text>
-            <Text style={styles.statLabel}>pace /km</Text>
+            {sport === 'bike' ? (
+              <>
+                <Text style={styles.statValue}>{formatSpeedKmH(elapsedMs, distanceM)}</Text>
+                <Text style={styles.statLabel}>km/h</Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.statValue}>{formatPace(elapsedMs, distanceM)}</Text>
+                <Text style={styles.statLabel}>pace /km</Text>
+              </>
+            )}
           </View>
         </View>
       </View>
 
-      {status === 'idle' && <HeroBand style={styles.heroBand} />}
-
       <View style={styles.actions}>
         {error && <ErrorText>{error}</ErrorText>}
         {status === 'idle' && (
-          <>
-            <Button title="Start run" onPress={handleStart} busy={starting} />
-            {pendingCount > 0 && (
-              <Button
-                title={`Upload ${pendingCount} saved run${pendingCount > 1 ? 's' : ''}`}
-                variant="ghost"
-                onPress={handleSyncPending}
-                busy={syncing}
-              />
-            )}
-            <Button title="Sign out" variant="ghost" onPress={() => supabase.auth.signOut()} />
-          </>
+          <Button title={`Start ${SPORT_LABEL[sport].toLowerCase()}`} onPress={handleStart} busy={starting} />
         )}
         {status === 'recording' && (
           <View style={styles.actionRow}>
@@ -174,24 +195,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  headerBrand: {
+  backBtn: {
+    width: 44,
+    height: 44,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+  backChevron: {
+    fontFamily: fonts.display,
+    fontSize: 34,
+    lineHeight: 34,
+    color: colors.ink,
+  },
+  sportBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
   },
-  headerLogo: {
-    width: 28,
-    height: 28,
-    borderRadius: 7,
-  },
-  wordmark: {
-    fontFamily: fonts.display,
-    fontSize: 20,
-    color: colors.ink,
-    letterSpacing: -0.3,
-  },
-  heroBand: {
-    marginBottom: 16,
+  sportBadgeText: {
+    fontFamily: fonts.textSemi,
+    fontSize: 13,
+    letterSpacing: 0.3,
   },
   statusPill: {
     flexDirection: 'row',

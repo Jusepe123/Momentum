@@ -51,7 +51,7 @@ export function SignInScreen() {
           Momentum<Text style={{ color: colors.accent }}>.</Text>
         </Text>
         <Text style={styles.subtitle}>
-          Sign in with your Momentum account to record runs.
+          Sign in with your Momentum account to record sessions.
         </Text>
         <Field label="Email">
           <Input
@@ -86,30 +86,36 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.surface,
-    justifyContent: 'center',
-    padding: 24,
+    justifyContent: 'flex-start',
+    paddingTop: 76,
+    paddingHorizontal: 26,
+    paddingBottom: 32,
   },
   card: {
-    gap: 16,
+    gap: 18,
   },
   logo: {
     width: 56,
     height: 56,
-    borderRadius: 12,
+    borderRadius: 16,
   },
   heroBand: {
-    marginTop: 28,
+    marginTop: 'auto',
+    borderRadius: 20,
   },
   title: {
-    fontFamily: fonts.display,
-    fontSize: 34,
+    fontFamily: fonts.displaySemi,
+    fontSize: 38,
     color: colors.ink,
     letterSpacing: -0.5,
+    marginTop: 4,
   },
   subtitle: {
     fontFamily: fonts.text,
-    fontSize: 14,
+    fontSize: 15,
+    lineHeight: 21,
     color: colors.inkDim,
-    marginBottom: 8,
+    marginBottom: 6,
+    marginTop: -8,
   },
 })

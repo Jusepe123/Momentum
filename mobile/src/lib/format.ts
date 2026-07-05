@@ -27,3 +27,14 @@ export function formatPace(ms: number, distanceM: number): string {
   const s = totalSec % 60
   return `${m}:${String(s).padStart(2, '0')}`
 }
+
+/**
+ * Average speed in km/h to 1 decimal — the bike metric (higher is better).
+ * Returns '—' until there is enough signal (≥100 m and ≥30 s), mirroring the
+ * guards in formatPace so an early reading never shows a wild number.
+ */
+export function formatSpeedKmH(ms: number, distanceM: number): string {
+  if (distanceM < 100 || ms < 30000) return '—'
+  const kmh = distanceM / 1000 / (ms / 3600000)
+  return kmh.toFixed(1)
+}

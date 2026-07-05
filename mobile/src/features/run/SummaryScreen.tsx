@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useRunStore } from '../../tracking/store'
 import { activeElapsedMs } from '../../lib/geo/elapsed'
-import { formatElapsed, formatKm, formatPace } from '../../lib/format'
+import { formatElapsed, formatKm, formatPace, formatSpeedKmH } from '../../lib/format'
 import { addPending, removePending, type PendingRun } from '../../upload/pending'
 import { uploadRun } from '../../upload/uploadRun'
 import { Button, ErrorText, Input } from '../../components/ui'
@@ -16,10 +16,11 @@ const EFFORT_LEVELS = [
   { rpe: 9, label: 'Max effort', hint: 'nothing left' },
 ] as const
 
-export function SummaryScreen({ userId: _userId }: { userId: string }) {
+export function SummaryScreen() {
   const segments = useRunStore((s) => s.segments)
   const distanceM = useRunStore((s) => s.distance.totalM)
   const dateLocal = useRunStore((s) => s.dateLocal)
+  const sport = useRunStore((s) => s.sport)
   // Assigned by the store at finish() and persisted in the snapshot, so a
   // remount or process death can't mint a second identity → no duplicate
   // queue entries, and the upload itself is idempotent on this id.
@@ -44,6 +45,7 @@ export function SummaryScreen({ userId: _userId }: { userId: string }) {
     setAttempted(true)
     const run: PendingRun = {
       id: uploadId,
+      sport,
       dateLocal,
       activeMs,
       distanceM,
@@ -81,7 +83,7 @@ export function SummaryScreen({ userId: _userId }: { userId: string }) {
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Run complete</Text>
+      <Text style={styles.title}>{sport === 'bike' ? 'Ride complete' : 'Run complete'}</Text>
       <Text style={styles.date}>{dateLocal}</Text>
 
       <View style={styles.statsCard}>
@@ -96,8 +98,17 @@ export function SummaryScreen({ userId: _userId }: { userId: string }) {
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statBlock}>
-          <Text style={styles.statValue}>{formatPace(activeMs, distanceM)}</Text>
-          <Text style={styles.statLabel}>pace /km</Text>
+          {sport === 'bike' ? (
+            <>
+              <Text style={styles.statValue}>{formatSpeedKmH(activeMs, distanceM)}</Text>
+              <Text style={styles.statLabel}>km/h</Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.statValue}>{formatPace(activeMs, distanceM)}</Text>
+              <Text style={styles.statLabel}>pace /km</Text>
+            </>
+          )}
         </View>
       </View>
 
@@ -172,7 +183,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   title: {
-    fontFamily: fonts.display,
+    fontFamily: fonts.displaySemi,
     fontSize: 28,
     color: colors.ink,
     letterSpacing: -0.5,

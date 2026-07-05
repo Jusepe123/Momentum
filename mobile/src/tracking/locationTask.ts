@@ -38,8 +38,13 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
 
   // Keep the shade notification live (works with the screen off — this task
   // runs in background/headless JS). Paused updates happen in recorder.ts.
-  const { status, distance, segments } = useRunStore.getState()
+  const { status, distance, segments, sport } = useRunStore.getState()
   if (status === 'recording') {
-    await updateRunNotification('recording', distance.totalM, activeElapsedMs(segments, Date.now()))
+    await updateRunNotification(
+      'recording',
+      distance.totalM,
+      activeElapsedMs(segments, Date.now()),
+      sport,
+    )
   }
 })

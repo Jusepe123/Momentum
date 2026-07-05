@@ -2,16 +2,25 @@ import { Component, useEffect, useState, type ReactNode } from 'react'
 import { StatusBar } from 'expo-status-bar'
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
 import { useFonts } from 'expo-font'
-import { SpaceGrotesk_500Medium, SpaceGrotesk_700Bold } from '@expo-google-fonts/space-grotesk'
+import {
+  SpaceGrotesk_500Medium,
+  SpaceGrotesk_600SemiBold,
+  SpaceGrotesk_700Bold,
+} from '@expo-google-fonts/space-grotesk'
 import { Inter_400Regular, Inter_600SemiBold } from '@expo-google-fonts/inter'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './src/lib/supabase'
 import { reconcileOnLaunch } from './src/tracking/recorder'
 import { useRunStore } from './src/tracking/store'
 import { SignInScreen } from './src/features/auth/SignInScreen'
-import { RunScreen } from './src/features/run/RunScreen'
+import { HomeScreen } from './src/features/home/HomeScreen'
+import { RecorderScreen } from './src/features/run/RecorderScreen'
 import { SummaryScreen } from './src/features/run/SummaryScreen'
+import { StrengthScreen } from './src/features/strength/StrengthScreen'
 import { colors } from './src/theme'
+
+/** Which idle screen is showing while no recording is in flight. */
+type IdleScreen = 'home' | 'run' | 'bike' | 'strength'
 
 const FONT_TIMEOUT_MS = 5000
 
@@ -49,6 +58,7 @@ export default function App() {
 function Root() {
   const [fontsLoaded, fontError] = useFonts({
     SpaceGrotesk_500Medium,
+    SpaceGrotesk_600SemiBold,
     SpaceGrotesk_700Bold,
     Inter_400Regular,
     Inter_600SemiBold,
@@ -58,6 +68,18 @@ function Root() {
   const [authReady, setAuthReady] = useState(false)
   const [runReady, setRunReady] = useState(false)
   const status = useRunStore((s) => s.status)
+  const recordingSport = useRunStore((s) => s.sport)
+  // Which screen is showing while nothing is being recorded. A live/finished
+  // recording overrides this (the store status wins) so a resurrected run always
+  // reappears regardless of where the user last was.
+  const [idleScreen, setIdleScreen] = useState<IdleScreen>('home')
+
+  // When a recording finishes, pre-set the idle screen back to Home so that the
+  // moment its upload/discard resets the store to idle, we land on Home — not
+  // back on the recorder for that sport.
+  useEffect(() => {
+    if (status === 'finished') setIdleScreen('home')
+  }, [status])
 
   // Custom fonts must never be able to blank the app: on error or timeout we
   // proceed and Android falls back to the system font.
@@ -104,14 +126,59 @@ function Root() {
     <View style={styles.root}>
       {!session ? (
         <SignInScreen />
-      ) : status === 'finished' ? (
-        <SummaryScreen userId={session.user.id} />
       ) : (
-        <RunScreen />
+        <Screen
+          status={status}
+          recordingSport={recordingSport}
+          idleScreen={idleScreen}
+          setIdleScreen={setIdleScreen}
+          userEmail={session.user.email ?? null}
+        />
       )}
       <StatusBar style="dark" backgroundColor={colors.surface} />
     </View>
   )
+}
+
+/** Routes between the idle Home/recorder/strength screens and the live-recording
+ *  screens. A recording in flight (recording/paused) or finished always wins over
+ *  the idle selection — that's how a resurrected run reappears on launch. */
+function Screen({
+  status,
+  recordingSport,
+  idleScreen,
+  setIdleScreen,
+  userEmail,
+}: {
+  status: string
+  recordingSport: 'run' | 'bike'
+  idleScreen: IdleScreen
+  setIdleScreen: (s: IdleScreen) => void
+  userEmail: string | null
+}) {
+  if (status === 'finished') return <SummaryScreen />
+  // A live recording owns the screen — its sport comes from the store, and no
+  // Back is offered (you can't navigate away mid-recording).
+  if (status === 'recording' || status === 'paused') {
+    return <RecorderScreen sport={recordingSport} />
+  }
+
+  const goHome = () => setIdleScreen('home')
+  switch (idleScreen) {
+    case 'run':
+      return <RecorderScreen sport="run" onBack={goHome} />
+    case 'bike':
+      return <RecorderScreen sport="bike" onBack={goHome} />
+    case 'strength':
+      return <StrengthScreen onBack={goHome} />
+    default:
+      return (
+        <HomeScreen
+          onSelect={(sport) => setIdleScreen(sport)}
+          userEmail={userEmail}
+        />
+      )
+  }
 }
 
 const styles = StyleSheet.create({

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import {
   advance,
+  filterForSport,
   initialDistanceState,
   resetAnchor,
   type DistanceState,
@@ -12,9 +13,16 @@ import { uuid4 } from '../lib/uuid'
 
 export type RunStatus = 'idle' | 'recording' | 'paused' | 'finished'
 
+/** The two GPS-tracked cardio sports this recorder can capture. */
+export type RecorderSport = 'run' | 'bike'
+
 /** What survives process death. Everything else is derivable or ephemeral. */
 interface Snapshot {
   status: RunStatus
+  /** Which discipline is being recorded — picks the distance filter and drives
+   *  the sport-specific notification/UI. Persisted so a resurrected run keeps
+   *  its identity. */
+  sport: RecorderSport
   segments: Segment[]
   distance: DistanceState
   /** Local calendar date captured at run START — never recomputed at upload,
@@ -30,6 +38,7 @@ const SNAPSHOT_KEY = 'run_snapshot'
 
 const idleSnapshot: Snapshot = {
   status: 'idle',
+  sport: 'run',
   segments: [],
   distance: initialDistanceState,
   dateLocal: null,
@@ -37,7 +46,7 @@ const idleSnapshot: Snapshot = {
 }
 
 interface RunStore extends Snapshot {
-  start: (dateLocal: string, now: number) => void
+  start: (sport: RecorderSport, dateLocal: string, now: number) => void
   pause: (now: number) => void
   resume: (now: number) => void
   finish: (now: number) => void
@@ -58,6 +67,7 @@ let writeChain: Promise<void> = Promise.resolve()
 function persist(state: Snapshot) {
   const snap: Snapshot = {
     status: state.status,
+    sport: state.sport,
     segments: state.segments,
     distance: state.distance,
     dateLocal: state.dateLocal,
@@ -83,9 +93,10 @@ let hydration: Promise<void> | null = null
 export const useRunStore = create<RunStore>()((set, get) => ({
   ...idleSnapshot,
 
-  start: (dateLocal, now) => {
+  start: (sport, dateLocal, now) => {
     const next: Snapshot = {
       status: 'recording',
+      sport,
       segments: [{ startedAt: now, endedAt: null }],
       distance: initialDistanceState,
       dateLocal,
@@ -130,7 +141,8 @@ export const useRunStore = create<RunStore>()((set, get) => ({
 
   ingest: (points) => {
     if (get().status !== 'recording') return
-    const distance = points.reduce((d, p) => advance(d, p), get().distance)
+    const cfg = filterForSport(get().sport)
+    const distance = points.reduce((d, p) => advance(d, p, cfg), get().distance)
     set({ distance })
     persist(get())
   },

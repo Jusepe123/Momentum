@@ -1,6 +1,7 @@
 import { Platform } from 'react-native'
-import { formatElapsed, formatKm, formatPace } from '../lib/format'
-import { colors } from '../theme'
+import { formatElapsed, formatKm, formatPace, formatSpeedKmH } from '../lib/format'
+import { sportColor } from '../theme'
+import type { RecorderSport } from './store'
 
 /**
  * Live run-progress notification (km · time · pace), updated from the
@@ -58,22 +59,35 @@ export async function updateRunNotification(
   state: 'recording' | 'paused',
   distanceM: number,
   elapsedMs: number,
+  sport: RecorderSport = 'run',
 ) {
   if (!notifications) return
   try {
     await ensureChannel(notifications)
-    const pace = formatPace(elapsedMs, distanceM)
-    const stats = `${formatKm(distanceM)} km · ${formatElapsed(elapsedMs)}${
-      pace === '—:—' ? '' : ` · ${pace} /km`
-    }`
+    // Bike shows speed (km/h, higher=better); run shows pace (/km, lower=better).
+    const metric =
+      sport === 'bike'
+        ? (() => {
+            const speed = formatSpeedKmH(elapsedMs, distanceM)
+            return speed === '—' ? '' : ` · ${speed} km/h`
+          })()
+        : (() => {
+            const pace = formatPace(elapsedMs, distanceM)
+            return pace === '—:—' ? '' : ` · ${pace} /km`
+          })()
+    const stats = `${formatKm(distanceM)} km · ${formatElapsed(elapsedMs)}${metric}`
+    const noun = sport === 'bike' ? 'ride' : 'run'
     await notifications.scheduleNotificationAsync({
       identifier: NOTIFICATION_ID, // same id → updates in place
       content: {
-        title: state === 'recording' ? 'Recording run' : 'Run paused',
+        title:
+          state === 'recording'
+            ? `Recording ${noun}`
+            : `${noun.charAt(0).toUpperCase()}${noun.slice(1)} paused`,
         body: stats,
         sticky: true,
         sound: false,
-        color: colors.run,
+        color: sportColor[sport],
         priority: notifications.AndroidNotificationPriority.LOW,
       },
       trigger: { channelId: CHANNEL_ID }, // immediate, on the silent channel

@@ -53,7 +53,7 @@ export function Button({ title, variant = 'primary', busy, disabled, ...rest }: 
 export function Input(props: TextInputProps) {
   return (
     <TextInput
-      placeholderTextColor={colors.inkFaint}
+      placeholderTextColor={colors.muted}
       style={styles.input}
       {...props}
     />
@@ -76,12 +76,12 @@ export function ErrorText({ children }: { children: string }) {
 const styles = StyleSheet.create({
   button: {
     backgroundColor: colors.ink,
-    borderRadius: 10,
-    paddingVertical: 14,
+    borderRadius: 14,
+    paddingVertical: 16,
     paddingHorizontal: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 50,
+    minHeight: 52,
   },
   buttonGhost: {
     backgroundColor: 'transparent',
@@ -93,26 +93,26 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: colors.panel,
-    fontFamily: fonts.textSemi,
+    fontFamily: fonts.displaySemi,
     fontSize: 16,
   },
   input: {
     backgroundColor: colors.panel,
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    borderRadius: 14,
+    paddingVertical: 15,
+    paddingHorizontal: 18,
     fontFamily: fonts.text,
     fontSize: 16,
     color: colors.ink,
   },
   fieldLabel: {
     fontFamily: fonts.textSemi,
-    fontSize: 12,
-    letterSpacing: 0.6,
+    fontSize: 11,
+    letterSpacing: 0.9,
     textTransform: 'uppercase',
-    color: colors.inkDim,
+    color: colors.inkFaint,
   },
   error: {
     fontFamily: fonts.text,
