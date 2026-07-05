@@ -10,6 +10,7 @@ import {
 import { supabase } from '../../lib/supabase'
 import { colors, fonts } from '../../theme'
 import { Button, ErrorText, Field, Input } from '../../components/ui'
+import { HeroBand } from '../../components/HeroBand'
 
 /**
  * Sign in only — accounts are created on the web app. Same Supabase project,
@@ -76,13 +77,7 @@ export function SignInScreen() {
         <Button title="Sign in" onPress={handleSignIn} busy={busy} />
       </View>
 
-      <View style={styles.heroBand}>
-        <Image
-          source={require('../../../assets/brand/hero.png')}
-          style={styles.heroImage}
-          resizeMode="contain"
-        />
-      </View>
+      <HeroBand style={styles.heroBand} />
     </KeyboardAvoidingView>
   )
 }
@@ -102,19 +97,8 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 12,
   },
-  // Same treatment as the web dashboard banner: artwork on its own paper
-  // color inside a hairline-bordered card.
   heroBand: {
     marginTop: 28,
-    backgroundColor: colors.paper,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  heroImage: {
-    width: '100%',
-    aspectRatio: 1408 / 768,
   },
   title: {
     fontFamily: fonts.display,

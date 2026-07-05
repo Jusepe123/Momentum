@@ -56,6 +56,8 @@ Expo **SDK 52** (pinned — user's choice; use `npx expo install` for native dep
 
 Invariants (see `mobile/README.md` for the full list): `index.ts` imports `src/tracking/locationTask.ts` first (headless launches); run date captured at START via `todayLocalISO()`, never at upload; upload idempotent — `sessions.id` is a client UUID minted at `finish()` and persisted in the run snapshot (`run_snapshot` in AsyncStorage), unique violation = already uploaded; pause never stops the foreground service (ingest discards instead); snapshot writes are serialized (`flushSnapshot()` awaited at start/finish). Distance-filter thresholds in `DEFAULT_FILTER` are calibration knobs; the rules' semantics are pinned by `distance.test.ts` incl. exact gate boundaries.
 
+Layout gotcha (cost two broken builds): under the New Architecture (RN 0.76 Fabric, `newArchEnabled: true`) an `Image` sized with `width: '100%'` + `aspectRatio` is silently ignored on-device and renders at intrinsic size — a 1408dp-wide artwork fills the screen with its left edge (the "huge zoom" bug). Size brand images with explicit numeric dimensions measured via `onLayout` (`src/components/HeroBand.tsx` is the pattern). Verify layout on the emulator (`Pixel_7_Pro` AVD exists on this machine; `adb` at `%LOCALAPPDATA%\Android\Sdk\platform-tools`), not by reading styles.
+
 ## Notes
 
 - The user may have `[demo]`-tagged seed sessions in the dev database (identifiable via `notes like '[demo]%'`); delete only those when asked to clean up demo data.

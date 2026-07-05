@@ -8,6 +8,7 @@ import { supabase } from '../../lib/supabase'
 import { listPending, removePending } from '../../upload/pending'
 import { uploadRun } from '../../upload/uploadRun'
 import { Button, ErrorText } from '../../components/ui'
+import { HeroBand } from '../../components/HeroBand'
 import { colors, fonts } from '../../theme'
 
 export function RunScreen() {
@@ -112,15 +113,7 @@ export function RunScreen() {
         </View>
       </View>
 
-      {status === 'idle' && (
-        <View style={styles.heroBand}>
-          <Image
-            source={require('../../../assets/brand/hero.png')}
-            style={styles.heroImage}
-            resizeMode="contain"
-          />
-        </View>
-      )}
+      {status === 'idle' && <HeroBand style={styles.heroBand} />}
 
       <View style={styles.actions}>
         {error && <ErrorText>{error}</ErrorText>}
@@ -197,19 +190,8 @@ const styles = StyleSheet.create({
     color: colors.ink,
     letterSpacing: -0.3,
   },
-  // Same treatment as the web dashboard banner: artwork on its own paper
-  // color inside a hairline-bordered card. Idle screen only.
   heroBand: {
-    backgroundColor: colors.paper,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 12,
-    overflow: 'hidden',
     marginBottom: 16,
-  },
-  heroImage: {
-    width: '100%',
-    aspectRatio: 1408 / 768,
   },
   statusPill: {
     flexDirection: 'row',
