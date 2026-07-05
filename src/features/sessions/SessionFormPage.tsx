@@ -5,7 +5,7 @@ import { sportColorClass } from '../../components/sportColors'
 import { SportIcon } from '../../components/sportIcons'
 import { todayLocalISO } from '../../lib/dates'
 import { formatMinSec } from '../../lib/format'
-import { paceSecPer100m, paceSecPerKm } from '../../lib/scoring'
+import { paceSecPerKm, speedKmH } from '../../lib/scoring'
 import { useRoutines, type RoutineWithSets } from '../routines/hooks'
 import {
   useCreateExercise,
@@ -40,9 +40,9 @@ const EFFORT_LEVELS = [
 
 const DURATION_PRESETS = [30, 45, 60, 90] as const
 
-const DISTANCE_PRESETS: Record<'run' | 'swim', number[]> = {
+const DISTANCE_PRESETS: Record<'run' | 'bike', number[]> = {
   run: [5, 10, 21.1], // km
-  swim: [500, 1000, 1500, 2000], // m
+  bike: [10, 20, 40], // km
 }
 
 function draftFromSession(s: SessionWithDetails): {
@@ -143,7 +143,7 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
     const metres = meta.distanceUnit === 'km' ? raw * 1000 : raw
     return sport === 'run'
       ? `${formatMinSec(paceSecPerKm(mins * 60, metres))} /km`
-      : `${formatMinSec(paceSecPer100m(mins * 60, metres))} /100m`
+      : `${speedKmH(mins * 60, metres).toFixed(1)} km/h`
   }, [meta.distanceUnit, sport, duration, distance])
 
   function addSet() {
@@ -380,9 +380,16 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
         </Field>
 
         {meta.distanceUnit && (
-          <Field label="Distance" hint={pacePreview ? `pace ${pacePreview}` : meta.distanceUnit}>
+          <Field
+            label="Distance"
+            hint={
+              pacePreview
+                ? `${sport === 'run' ? 'pace' : 'speed'} ${pacePreview}`
+                : meta.distanceUnit
+            }
+          >
             <div className="flex flex-wrap items-center gap-2">
-              {DISTANCE_PRESETS[sport as 'run' | 'swim'].map((p) => (
+              {DISTANCE_PRESETS[sport as 'run' | 'bike'].map((p) => (
                 <Chip
                   key={p}
                   selected={distance === String(p)}

@@ -5,6 +5,7 @@ import {
   computePRs,
   dailyLoadSeries,
   paceHistory,
+  speedHistory,
   strengthHistories,
 } from './selectors'
 
@@ -119,7 +120,7 @@ describe('strengthHistories', () => {
 })
 
 describe('paceHistory', () => {
-  it('returns best (lowest) pace per date for the requested sport', () => {
+  it('returns best (lowest) running pace per date', () => {
     const sessions = [
       session({
         date: '2026-06-01',
@@ -133,10 +134,37 @@ describe('paceHistory', () => {
         duration_min: 30,
         cardio_details: { session_id: 's', distance_m: 5000 }, // 6:00/km
       }),
-      session({ date: '2026-06-02', sport: 'swim', duration_min: 30 }),
+      session({ date: '2026-06-02', sport: 'bike', duration_min: 30 }),
     ]
-    const history = paceHistory(sessions, 'run')
+    const history = paceHistory(sessions)
     expect(history).toEqual([{ date: '2026-06-01', value: 300 }])
+  })
+})
+
+describe('speedHistory', () => {
+  it('returns best (highest) cycling speed per date, ignoring non-bike sports', () => {
+    const sessions = [
+      session({
+        date: '2026-06-01',
+        sport: 'bike',
+        duration_min: 40,
+        cardio_details: { session_id: 's', distance_m: 20000 }, // 30 km/h
+      }),
+      session({
+        date: '2026-06-01',
+        sport: 'bike',
+        duration_min: 40,
+        cardio_details: { session_id: 's', distance_m: 10000 }, // 15 km/h, slower
+      }),
+      session({
+        date: '2026-06-02',
+        sport: 'run',
+        duration_min: 30,
+        cardio_details: { session_id: 's', distance_m: 6000 },
+      }),
+    ]
+    const history = speedHistory(sessions)
+    expect(history).toEqual([{ date: '2026-06-01', value: 30 }])
   })
 })
 

@@ -73,7 +73,7 @@ export interface SessionDraft {
   notes: string
   /** strength only */
   sets: SetDraft[]
-  /** run/swim only, metres */
+  /** run/bike only, metres */
   distanceM: number | null
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { paceSecPer100m, paceSecPerKm, riegelPredict } from './cardio'
+import { paceSecPerKm, riegelPredict, speedKmH } from './cardio'
 
 describe('riegelPredict', () => {
   it('predicts time for a longer distance (T2 = T1 * (D2/D1)^1.06)', () => {
@@ -37,13 +37,14 @@ describe('paceSecPerKm', () => {
   })
 })
 
-describe('paceSecPer100m', () => {
-  it('returns seconds per 100 m', () => {
-    expect(paceSecPer100m(1800, 3000)).toBe(60) // 30:00 for 3 km swim = 1:00/100m
+describe('speedKmH', () => {
+  it('returns kilometres per hour', () => {
+    expect(speedKmH(3600, 40000)).toBe(40) // 40 km in 1 hour = 40 km/h
+    expect(speedKmH(7200, 40000)).toBe(20) // 40 km in 2 hours = 20 km/h
   })
 
   it('rejects non-positive duration or distance', () => {
-    expect(() => paceSecPer100m(-1, 3000)).toThrow(RangeError)
-    expect(() => paceSecPer100m(1800, -3000)).toThrow(RangeError)
+    expect(() => speedKmH(-1, 40000)).toThrow(RangeError)
+    expect(() => speedKmH(3600, -40000)).toThrow(RangeError)
   })
 })

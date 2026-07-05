@@ -32,6 +32,7 @@ import {
   computePRs,
   dailyLoadSeries,
   paceHistory,
+  speedHistory,
   strengthHistories,
   toLoadPoints,
 } from './selectors'
@@ -371,14 +372,25 @@ function StrengthProgressCard({ sessions }: { sessions: SessionWithDetails[] }) 
 }
 
 function PaceCard({ sessions }: { sessions: SessionWithDetails[] }) {
-  const [sport, setSport] = useState<'run' | 'swim'>('run')
-  const points = useMemo(() => paceHistory(sessions, sport), [sessions, sport])
-  const unit = sport === 'run' ? '/km' : '/100m'
+  const [sport, setSport] = useState<'run' | 'bike'>('run')
+  const isRun = sport === 'run'
+  const points = useMemo(
+    () => (isRun ? paceHistory(sessions) : speedHistory(sessions)),
+    [sessions, isRun],
+  )
+  const unitFormat = isRun
+    ? (v: number) => `${formatMinSec(v)} /km`
+    : (v: number) => `${v.toFixed(1)} km/h`
 
   return (
-    <Card title="Pace progress" subtitle="Best pace per day — lower is better">
+    <Card
+      title={isRun ? 'Pace progress' : 'Speed progress'}
+      subtitle={
+        isRun ? 'Best pace per day — lower is better' : 'Best speed per day — higher is better'
+      }
+    >
       <div role="tablist" className="mb-3 grid w-48 grid-cols-2 gap-1 rounded-lg bg-panel-2 p-1">
-        {(['run', 'swim'] as const).map((s) => (
+        {(['run', 'bike'] as const).map((s) => (
           <button
             key={s}
             type="button"
@@ -394,12 +406,12 @@ function PaceCard({ sessions }: { sessions: SessionWithDetails[] }) {
         ))}
       </div>
       {points.length === 0 ? (
-        <EmptyHint>Log {sport} sessions with distance to track your pace.</EmptyHint>
+        <EmptyHint>Log {sport} sessions with distance to track your {isRun ? 'pace' : 'speed'}.</EmptyHint>
       ) : (
         <ProgressChart
           points={points}
-          unitFormat={(v) => `${formatMinSec(v)} ${unit}`}
-          yLabel="Pace"
+          unitFormat={unitFormat}
+          yLabel={isRun ? 'Pace' : 'Speed'}
         />
       )}
     </Card>
@@ -482,7 +494,7 @@ export function DashboardPage() {
             Your gains, visualized<span className="text-accent">.</span>
           </h1>
           <p className="mt-1 max-w-xs text-sm text-ink-dim">
-            Strength, runs and swims — one load scale, one trend.
+            Strength, runs and rides — one load scale, one trend.
           </p>
         </div>
         <BrandImage

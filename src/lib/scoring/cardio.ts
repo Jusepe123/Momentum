@@ -22,9 +22,9 @@ export function paceSecPerKm(durationSec: number, distanceM: number): number {
   return durationSec / (distanceM / 1000)
 }
 
-/** Swimming pace in seconds per 100 metres. */
-export function paceSecPer100m(durationSec: number, distanceM: number): number {
+/** Cycling speed in kilometres per hour. */
+export function speedKmH(durationSec: number, distanceM: number): number {
   assertPositive(durationSec, 'Duration')
   assertPositive(distanceM, 'Distance')
-  return durationSec / (distanceM / 100)
+  return distanceM / 1000 / (durationSec / 3600)
 }

@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { Alert, Button } from '../../components/ui'
 import { sportBgClass, sportColorClass } from '../../components/sportColors'
 import { SportIcon } from '../../components/sportIcons'
-import { paceSecPer100m, paceSecPerKm, volumeLoad } from '../../lib/scoring'
+import { paceSecPerKm, speedKmH, volumeLoad } from '../../lib/scoring'
 import { formatDate, formatDistance, formatMinSec } from '../../lib/format'
 import { useDeleteSession, useSessions, type SessionWithDetails } from './hooks'
 import { sportMeta } from './sportMeta'
@@ -18,11 +18,11 @@ function sportStat(s: SessionWithDetails): string | null {
   if (!s.cardio_details) return null
   const dist = s.cardio_details.distance_m
   const durationSec = s.duration_min * 60
-  const pace =
+  const metric =
     s.sport === 'run'
       ? `${formatMinSec(paceSecPerKm(durationSec, dist))} /km`
-      : `${formatMinSec(paceSecPer100m(durationSec, dist))} /100m`
-  return `${formatDistance(dist)} · ${pace}`
+      : `${speedKmH(durationSec, dist).toFixed(1)} km/h`
+  return `${formatDistance(dist)} · ${metric}`
 }
 
 function SessionRow({ session }: { session: SessionWithDetails }) {
@@ -119,7 +119,7 @@ export function SessionsPage() {
           <p className="font-display text-4xl font-bold text-ink-faint">0</p>
           <h2 className="mt-3 font-display text-lg font-semibold">No sessions yet</h2>
           <p className="mx-auto mt-1 max-w-xs text-sm text-ink-dim">
-            Log your first workout — strength, run, or swim — and Momentum starts tracking your
+            Log your first workout — strength, run, or bike — and Momentum starts tracking your
             load and gains.
           </p>
           <Link to="/sessions/new" className="mt-6 inline-block">

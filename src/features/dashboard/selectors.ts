@@ -7,9 +7,9 @@ import {
   acwr,
   epochDay,
   estimate1RM,
-  paceSecPer100m,
   paceSecPerKm,
   sessionLoad,
+  speedKmH,
   type MetricPoint,
   type SessionLoadPoint,
 } from '../../lib/scoring'
@@ -101,21 +101,28 @@ export function strengthHistories(sessions: SessionWithDetails[]): ExerciseHisto
     .sort((a, b) => a.name.localeCompare(b.name))
 }
 
-/** Best (lowest) pace per date: sec/km for run, sec/100m for swim. */
-export function paceHistory(
-  sessions: SessionWithDetails[],
-  sport: 'run' | 'swim',
-): MetricPoint[] {
+/** Best (lowest) running pace per date, in sec/km. */
+export function paceHistory(sessions: SessionWithDetails[]): MetricPoint[] {
   const byDate = new Map<string, number>()
   for (const s of sessions) {
-    if (s.sport !== sport || !s.cardio_details) continue
-    const durationSec = s.duration_min * 60
-    const pace =
-      sport === 'run'
-        ? paceSecPerKm(durationSec, s.cardio_details.distance_m)
-        : paceSecPer100m(durationSec, s.cardio_details.distance_m)
+    if (s.sport !== 'run' || !s.cardio_details) continue
+    const pace = paceSecPerKm(s.duration_min * 60, s.cardio_details.distance_m)
     const prev = byDate.get(s.date)
     if (prev === undefined || pace < prev) byDate.set(s.date, pace)
+  }
+  return [...byDate.entries()]
+    .map(([date, value]) => ({ date, value }))
+    .sort((a, b) => epochDay(a.date) - epochDay(b.date))
+}
+
+/** Best (highest) cycling speed per date, in km/h. */
+export function speedHistory(sessions: SessionWithDetails[]): MetricPoint[] {
+  const byDate = new Map<string, number>()
+  for (const s of sessions) {
+    if (s.sport !== 'bike' || !s.cardio_details) continue
+    const speed = speedKmH(s.duration_min * 60, s.cardio_details.distance_m)
+    const prev = byDate.get(s.date)
+    if (prev === undefined || speed > prev) byDate.set(s.date, speed)
   }
   return [...byDate.entries()]
     .map(([date, value]) => ({ date, value }))
@@ -145,24 +152,42 @@ export function computePRs(sessions: SessionWithDetails[], asOf: string): Person
     })
   }
 
-  for (const sport of ['run', 'swim'] as const) {
-    const paces = paceHistory(sessions, sport)
-    if (paces.length > 0) {
-      const best = paces.reduce((a, b) => (b.value < a.value ? b : a))
-      prs.push({
-        label: `Fastest ${sport} pace`,
-        value: `${formatMinSec(best.value)} ${sport === 'run' ? '/km' : '/100m'}`,
-        date: best.date,
-        isNew: isNew(best.date),
-      })
-    }
+  // Run: fastest pace (lowest sec/km).
+  const paces = paceHistory(sessions)
+  if (paces.length > 0) {
+    const best = paces.reduce((a, b) => (b.value < a.value ? b : a))
+    prs.push({
+      label: 'Fastest run pace',
+      value: `${formatMinSec(best.value)} /km`,
+      date: best.date,
+      isNew: isNew(best.date),
+    })
+  }
+
+  // Bike: top speed (highest km/h).
+  const speeds = speedHistory(sessions)
+  if (speeds.length > 0) {
+    const best = speeds.reduce((a, b) => (b.value > a.value ? b : a))
+    prs.push({
+      label: 'Top speed',
+      value: `${best.value.toFixed(1)} km/h`,
+      date: best.date,
+      isNew: isNew(best.date),
+    })
+  }
+
+  // Longest cardio distance per sport.
+  for (const [sport, label] of [
+    ['run', 'Longest run'],
+    ['bike', 'Longest ride'],
+  ] as const) {
     const distances = sessions.filter((s) => s.sport === sport && s.cardio_details)
     if (distances.length > 0) {
       const best = distances.reduce((a, b) =>
         b.cardio_details!.distance_m > a.cardio_details!.distance_m ? b : a,
       )
       prs.push({
-        label: `Longest ${sport}`,
+        label,
         value: formatDistance(best.cardio_details!.distance_m),
         date: best.date,
         isNew: isNew(best.date),

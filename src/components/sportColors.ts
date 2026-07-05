@@ -4,11 +4,11 @@ import type { Sport } from '../features/sessions/sportMeta'
 export const sportColorClass: Record<Sport, string> = {
   strength: 'text-sport-strength',
   run: 'text-sport-run',
-  swim: 'text-sport-swim',
+  bike: 'text-sport-bike',
 }
 
 export const sportBgClass: Record<Sport, string> = {
   strength: 'bg-sport-strength/10',
   run: 'bg-sport-run/10',
-  swim: 'bg-sport-swim/10',
+  bike: 'bg-sport-bike/10',
 }

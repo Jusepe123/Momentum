@@ -45,14 +45,16 @@ function RunIcon() {
   )
 }
 
-/** Freestyle: extended body line, recovery arm arcing, water below. */
-function SwimIcon() {
+/** Road bike: two wheels, diamond frame, handlebars. */
+function BikeIcon() {
   return (
     <>
-      <circle cx="32" cy="18.5" r="3.2" fill="currentColor" />
-      <path d="M6 25 L42 23" {...stroke} />
-      <path d="M12 24 C16 10, 28 8, 33 17" {...stroke} />
-      <path d="M6 33 q4.5 -3.5 9 0 t9 0 t9 0 t9 0" {...stroke} strokeWidth={3} />
+      <circle cx="11" cy="33" r="8" {...stroke} />
+      <circle cx="37" cy="33" r="8" {...stroke} />
+      <path d="M11 33 L21 15 L34 15" {...stroke} />
+      <path d="M21 15 L27 33 L37 33" {...stroke} />
+      <path d="M11 33 L27 33" {...stroke} />
+      <path d="M31 12 H38" {...stroke} />
     </>
   )
 }
@@ -60,7 +62,7 @@ function SwimIcon() {
 const icons: Record<Sport, () => React.ReactElement> = {
   strength: StrengthIcon,
   run: RunIcon,
-  swim: SwimIcon,
+  bike: BikeIcon,
 }
 
 export function SportIcon({
