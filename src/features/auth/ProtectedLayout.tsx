@@ -2,6 +2,7 @@ import { NavLink, Navigate, Outlet, useNavigate } from 'react-router-dom'
 import { Logo } from '../../components/brand'
 import { Spinner } from '../../components/ui'
 import { supabase } from '../../lib/supabase'
+import { AvatarButton } from '../profile/AvatarButton'
 import { useAuth } from './AuthProvider'
 
 export function ProtectedLayout() {
@@ -50,12 +51,15 @@ export function ProtectedLayout() {
               </NavLink>
             </div>
           </div>
-          <button
-            onClick={signOut}
-            className="text-sm text-ink-dim transition-colors duration-200 hover:text-ink"
-          >
-            Sign out
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={signOut}
+              className="text-sm text-ink-dim transition-colors duration-200 hover:text-ink"
+            >
+              Sign out
+            </button>
+            <AvatarButton />
+          </div>
         </nav>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
