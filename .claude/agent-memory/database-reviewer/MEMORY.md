@@ -1,3 +1,4 @@
 - [Momentum 0001 schema review](momentum_0001_schema_review.md) — pre-apply findings for initial migration incl. CRITICAL FK cascade/restrict ordering bug (exercises vs strength_sets)
 - [Momentum 0002 replace_session_details review](momentum_0002_replace_session_details_review.md) — RPC security sound (no CRITICAL); HIGH: unconditional delete + conditional insert silently wipes cardio_details if p_distance_m omitted
 - [Momentum 0003 routines review](momentum_0003_routines_review.md) — no CRITICAL/HIGH, prior feedback correctly applied; MEDIUM: exercise_id ownership unchecked, can block account deletion via deferred-FK diamond
+- [Momentum 0006 avatar-inline review](momentum_0006_avatar_inline_review.md) — no CRITICAL/HIGH; MEDIUM: dropping Storage MIME validation with only a length check on the new data-URL column

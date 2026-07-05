@@ -11,13 +11,28 @@ node_modules
 dist
 dist-ssr
 *.local
+.env
 .expo/
+
+# Build / test artifacts
+*.tsbuildinfo
+coverage
+test-results/
+playwright-report/
+
+# Mobile build outputs (produced by EAS locally, not source; mobile/.gitignore covers android/ios/env)
+*.apk
+*.aab
+
+# Design mockup exports (kept local, not app source)
+Momentum Mobile Redesign.html
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
 .idea
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
