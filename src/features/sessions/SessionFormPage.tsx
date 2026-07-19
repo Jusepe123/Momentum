@@ -7,6 +7,7 @@ import { todayLocalISO } from '../../lib/dates'
 import { formatMinSec } from '../../lib/format'
 import { paceSecPerKm, speedKmH } from '../../lib/scoring'
 import { useRoutines, type RoutineWithSets } from '../routines/hooks'
+import { expandGroups, groupSets } from '../routines/setGroups'
 import {
   useCreateExercise,
   useCreateSession,
@@ -18,11 +19,13 @@ import {
 } from './hooks'
 import { SPORTS, sportMeta, type Sport } from './sportMeta'
 
-interface SetRow {
+/** One editor row = N identical sets: exercise, set count, reps, one weight for all of them. */
+interface GroupRow {
   key: number
   exerciseId: string
-  weightKg: string
+  numSets: string
   reps: string
+  weightKg: string
 }
 
 let nextKey = 0
@@ -51,7 +54,7 @@ function draftFromSession(s: SessionWithDetails): {
   duration: string
   rpe: number
   notes: string
-  sets: SetRow[]
+  groups: GroupRow[]
   distance: string
 } {
   const unit = sportMeta[s.sport].distanceUnit
@@ -62,15 +65,18 @@ function draftFromSession(s: SessionWithDetails): {
     duration: String(s.duration_min),
     rpe: s.rpe,
     notes: s.notes ?? '',
-    sets: s.strength_sets
-      .slice()
-      .sort((a, b) => a.set_order - b.set_order)
-      .map((set) => ({
-        key: nextKey++,
-        exerciseId: set.exercise_id,
-        weightKg: String(set.weight_kg),
-        reps: String(set.reps),
-      })),
+    groups: groupSets(
+      s.strength_sets
+        .slice()
+        .sort((a, b) => a.set_order - b.set_order)
+        .map((set) => ({ exerciseId: set.exercise_id, weightKg: set.weight_kg, reps: set.reps })),
+    ).map((g) => ({
+      key: nextKey++,
+      exerciseId: g.exerciseId,
+      numSets: String(g.numSets),
+      reps: String(g.reps),
+      weightKg: String(g.weightKg),
+    })),
     distance: dist == null ? '' : unit === 'km' ? String(dist / 1000) : String(dist),
   }
 }
@@ -111,7 +117,7 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
             duration: '',
             rpe: null as number | null,
             notes: '',
-            sets: [] as SetRow[],
+            groups: [] as GroupRow[],
             distance: '',
           },
     [existing],
@@ -125,7 +131,7 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
   )
   const [rpe, setRpe] = useState<number | null>(initial.rpe)
   const [notes, setNotes] = useState(initial.notes)
-  const [sets, setSets] = useState<SetRow[]>(initial.sets)
+  const [groups, setGroups] = useState<GroupRow[]>(initial.groups)
   const [distance, setDistance] = useState(initial.distance)
   const [appliedRoutineId, setAppliedRoutineId] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
@@ -146,36 +152,40 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
       : `${speedKmH(mins * 60, metres).toFixed(1)} km/h`
   }, [meta.distanceUnit, sport, duration, distance])
 
-  function addSet() {
-    const prev = sets[sets.length - 1]
-    setSets([
-      ...sets,
+  function addGroup() {
+    const prev = groups[groups.length - 1]
+    setGroups([
+      ...groups,
       {
         key: nextKey++,
         exerciseId: prev?.exerciseId ?? exercises?.[0]?.id ?? '',
-        weightKg: prev?.weightKg ?? '',
+        numSets: prev?.numSets ?? '3',
         reps: prev?.reps ?? '',
+        weightKg: prev?.weightKg ?? '',
       },
     ])
   }
 
   function applyRoutine(routine: RoutineWithSets) {
-    setSets(
-      routine.routine_sets
-        .slice()
-        .sort((a, b) => a.set_order - b.set_order)
-        .map((rs) => ({
-          key: nextKey++,
-          exerciseId: rs.exercise_id,
-          weightKg: rs.weight_kg == null ? '' : String(rs.weight_kg),
-          reps: String(rs.reps),
-        })),
+    setGroups(
+      groupSets(
+        routine.routine_sets
+          .slice()
+          .sort((a, b) => a.set_order - b.set_order)
+          .map((rs) => ({ exerciseId: rs.exercise_id, weightKg: rs.weight_kg, reps: rs.reps })),
+      ).map((g) => ({
+        key: nextKey++,
+        exerciseId: g.exerciseId,
+        numSets: String(g.numSets),
+        reps: String(g.reps),
+        weightKg: g.weightKg == null ? '' : String(g.weightKg),
+      })),
     )
     setAppliedRoutineId(routine.id)
   }
 
-  function updateSet(key: number, patch: Partial<SetRow>) {
-    setSets(sets.map((s) => (s.key === key ? { ...s, ...patch } : s)))
+  function updateGroup(key: number, patch: Partial<GroupRow>) {
+    setGroups(groups.map((g) => (g.key === key ? { ...g, ...patch } : g)))
   }
 
   async function addCustomExercise(key: number) {
@@ -183,7 +193,7 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
     if (!name) return
     try {
       const ex = await createExercise.mutateAsync(name)
-      updateSet(key, { exerciseId: ex.id })
+      updateGroup(key, { exerciseId: ex.id })
     } catch (e) {
       setFormError(e instanceof Error ? e.message : 'Could not create exercise')
     }
@@ -214,23 +224,28 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
       distanceM = Math.round(meta.distanceUnit === 'km' ? raw * 1000 : raw)
     }
 
-    const parsedSets = sets.map((s) => ({
-      exerciseId: s.exerciseId,
-      weightKg: Number(s.weightKg),
-      reps: Number(s.reps),
+    const parsedGroups = groups.map((g) => ({
+      exerciseId: g.exerciseId,
+      numSets: Number(g.numSets),
+      reps: Number(g.reps),
+      weightKg: Number(g.weightKg),
     }))
     if (sport === 'strength') {
-      for (const s of parsedSets) {
-        if (!s.exerciseId) {
-          setFormError('Every set needs an exercise.')
+      for (const g of parsedGroups) {
+        if (!g.exerciseId) {
+          setFormError('Every exercise row needs an exercise.')
           return
         }
-        if (!Number.isFinite(s.weightKg) || s.weightKg < 0) {
-          setFormError('Set weight must be 0 or more (0 = bodyweight).')
+        if (!Number.isInteger(g.numSets) || g.numSets < 1 || g.numSets > 20) {
+          setFormError('Sets must be a whole number between 1 and 20.')
           return
         }
-        if (!Number.isInteger(s.reps) || s.reps < 1 || s.reps > 100) {
-          setFormError('Set reps must be a whole number between 1 and 100.')
+        if (!Number.isInteger(g.reps) || g.reps < 1 || g.reps > 100) {
+          setFormError('Reps must be a whole number between 1 and 100.')
+          return
+        }
+        if (!Number.isFinite(g.weightKg) || g.weightKg < 0) {
+          setFormError('Weight must be 0 or more (0 = bodyweight).')
           return
         }
       }
@@ -242,7 +257,7 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
       durationMin,
       rpe,
       notes,
-      sets: sport === 'strength' ? parsedSets : [],
+      sets: sport === 'strength' ? expandGroups(parsedGroups) : [],
       distanceM: sport === 'strength' ? null : distanceM,
     }
 
@@ -418,7 +433,7 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
         {sport === 'strength' && (
           <fieldset>
             <legend className="mb-1.5 text-xs font-medium uppercase tracking-wide text-ink-dim">
-              Sets
+              Exercises
             </legend>
 
             {routines && routines.length > 0 && (
@@ -437,9 +452,9 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
               </div>
             )}
 
-            {sets.length === 0 && (
+            {groups.length === 0 && (
               <p className="rounded-lg border border-dashed border-line bg-panel px-4 py-6 text-center text-sm text-ink-faint">
-                No sets yet. Sets power your 1RM progress tracking.
+                No exercises yet. Sets power your strength progress tracking.
                 {(!routines || routines.length === 0) && (
                   <>
                     {' '}
@@ -453,18 +468,18 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
               </p>
             )}
             <div className="space-y-2">
-              {sets.map((s, i) => (
-                <div key={s.key} className="flex items-center gap-2">
+              {groups.map((g, i) => (
+                <div key={g.key} className="flex items-center gap-2">
                   <span className="w-5 shrink-0 text-right font-display text-xs text-ink-faint">
                     {i + 1}
                   </span>
                   <Select
                     aria-label="Exercise"
-                    value={s.exerciseId}
+                    value={g.exerciseId}
                     onChange={(e) =>
                       e.target.value === '__new__'
-                        ? addCustomExercise(s.key)
-                        : updateSet(s.key, { exerciseId: e.target.value })
+                        ? addCustomExercise(g.key)
+                        : updateGroup(g.key, { exerciseId: e.target.value })
                     }
                     className="flex-1"
                   >
@@ -476,20 +491,23 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
                     <option value="__new__">+ New exercise…</option>
                   </Select>
                   <Input
-                    aria-label="Weight (kg)"
+                    aria-label="Sets"
                     type="number"
                     required
-                    min={0}
-                    max={1000}
-                    step="0.5"
-                    inputMode="decimal"
-                    placeholder="kg"
-                    value={s.weightKg}
-                    onChange={(e) => updateSet(s.key, { weightKg: e.target.value })}
-                    className="!w-24 shrink-0"
+                    min={1}
+                    max={20}
+                    step="1"
+                    inputMode="numeric"
+                    placeholder="sets"
+                    value={g.numSets}
+                    onChange={(e) => updateGroup(g.key, { numSets: e.target.value })}
+                    className="!w-16 shrink-0"
                   />
+                  <span aria-hidden className="shrink-0 text-xs text-ink-faint">
+                    ×
+                  </span>
                   <Input
-                    aria-label="Reps"
+                    aria-label="Reps per set"
                     type="number"
                     required
                     min={1}
@@ -497,14 +515,27 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
                     step="1"
                     inputMode="numeric"
                     placeholder="reps"
-                    value={s.reps}
-                    onChange={(e) => updateSet(s.key, { reps: e.target.value })}
+                    value={g.reps}
+                    onChange={(e) => updateGroup(g.key, { reps: e.target.value })}
+                    className="!w-16 shrink-0"
+                  />
+                  <Input
+                    aria-label="Weight for all sets (kg)"
+                    type="number"
+                    required
+                    min={0}
+                    max={1000}
+                    step="0.5"
+                    inputMode="decimal"
+                    placeholder="kg"
+                    value={g.weightKg}
+                    onChange={(e) => updateGroup(g.key, { weightKg: e.target.value })}
                     className="!w-20 shrink-0"
                   />
                   <button
                     type="button"
-                    aria-label={`Remove set ${i + 1}`}
-                    onClick={() => setSets(sets.filter((x) => x.key !== s.key))}
+                    aria-label={`Remove exercise row ${i + 1}`}
+                    onClick={() => setGroups(groups.filter((x) => x.key !== g.key))}
                     className="shrink-0 rounded-md px-2 py-1.5 text-sm text-ink-faint transition-colors hover:text-danger"
                   >
                     ✕
@@ -512,8 +543,8 @@ function SessionForm({ existing }: { existing?: SessionWithDetails }) {
                 </div>
               ))}
             </div>
-            <Button type="button" variant="ghost" onClick={addSet} className="mt-2 w-full">
-              + Add set
+            <Button type="button" variant="ghost" onClick={addGroup} className="mt-2 w-full">
+              + Add exercise
             </Button>
           </fieldset>
         )}

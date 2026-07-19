@@ -169,11 +169,14 @@ describe('speedHistory', () => {
 })
 
 describe('computePRs', () => {
-  it('finds best 1RM per exercise, best paces and distances, and flags recent PRs', () => {
+  it('reports the heaviest real set per exercise, best paces and distances, and flags recent PRs', () => {
     const sessions = [
       session({
         date: '2026-06-30',
-        strength_sets: [strengthSet('e1', 'Squat', 140, 3)],
+        strength_sets: [
+          strengthSet('e1', 'Squat', 140, 3),
+          strengthSet('e1', 'Squat', 120, 8), // higher est. 1RM would pick this; real record is 140
+        ],
       }),
       session({
         date: '2026-05-01',
@@ -185,11 +188,25 @@ describe('computePRs', () => {
     const prs = computePRs(sessions, '2026-07-03')
     const squat = prs.find((p) => p.label.includes('Squat'))
     expect(squat).toBeDefined()
+    expect(squat!.value).toBe('140 kg')
+    expect(squat!.date).toBe('2026-06-30')
     expect(squat!.isNew).toBe(true) // 3 days ago
     const pace = prs.find((p) => p.label.includes('run pace'))
     expect(pace).toBeDefined()
     expect(pace!.value).toBe('5:00 /km')
     expect(pace!.isNew).toBe(false) // 2 months ago
+  })
+
+  it('keeps the earliest date the record weight was lifted', () => {
+    const sessions = [
+      session({ date: '2026-06-10', strength_sets: [strengthSet('e1', 'Bench Press', 60, 5)] }),
+      session({ date: '2026-06-03', strength_sets: [strengthSet('e1', 'Bench Press', 60, 8)] }),
+      session({ date: '2026-06-17', strength_sets: [strengthSet('e1', 'Bench Press', 55, 8)] }),
+    ]
+    const prs = computePRs(sessions, '2026-07-03')
+    const bench = prs.find((p) => p.label.includes('Bench Press'))
+    expect(bench!.value).toBe('60 kg')
+    expect(bench!.date).toBe('2026-06-03') // first time the record was set
   })
 
   it('returns empty for no sessions', () => {

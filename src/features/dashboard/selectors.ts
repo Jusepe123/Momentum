@@ -142,11 +142,28 @@ export function computePRs(sessions: SessionWithDetails[], asOf: string): Person
   const prs: PersonalRecord[] = []
   const isNew = (date: string) => epochDay(asOf) - epochDay(date) <= NEW_PR_WINDOW_DAYS
 
-  for (const h of strengthHistories(sessions)) {
-    const best = h.points.reduce((a, b) => (b.value > a.value ? b : a))
+  // Strength: heaviest weight actually lifted per exercise (not an estimate).
+  // Ties keep the date the record was first set.
+  const bestByExercise = new Map<string, { name: string; weightKg: number; date: string }>()
+  for (const s of sessions) {
+    for (const set of s.strength_sets) {
+      if (set.weight_kg <= 0 || set.reps < 1) continue
+      const cur = bestByExercise.get(set.exercise_id)
+      const beats =
+        !cur || set.weight_kg > cur.weightKg || (set.weight_kg === cur.weightKg && s.date < cur.date)
+      if (beats) {
+        bestByExercise.set(set.exercise_id, {
+          name: set.exercise?.name ?? 'Unknown exercise',
+          weightKg: set.weight_kg,
+          date: s.date,
+        })
+      }
+    }
+  }
+  for (const best of [...bestByExercise.values()].sort((a, b) => a.name.localeCompare(b.name))) {
     prs.push({
-      label: `${h.name} est. 1RM`,
-      value: `${best.value.toFixed(1)} kg`,
+      label: `${best.name} heaviest lift`,
+      value: `${best.weightKg} kg`,
       date: best.date,
       isNew: isNew(best.date),
     })

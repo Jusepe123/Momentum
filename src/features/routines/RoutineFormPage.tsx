@@ -9,12 +9,15 @@ import {
   type RoutineDraft,
   type RoutineWithSets,
 } from './hooks'
+import { expandGroups, groupSets } from './setGroups'
 
-interface SetRow {
+/** One editor row = N identical sets: exercise, set count, reps, one target weight. */
+interface GroupRow {
   key: number
   exerciseId: string
-  weightKg: string
+  numSets: string
   reps: string
+  weightKg: string
 }
 
 let nextKey = 0
@@ -47,41 +50,45 @@ function RoutineForm({ existing }: { existing?: RoutineWithSets }) {
   const initial = useMemo(
     () => ({
       name: existing?.name ?? '',
-      sets: (existing?.routine_sets ?? [])
-        .slice()
-        .sort((a, b) => a.set_order - b.set_order)
-        .map((s) => ({
-          key: nextKey++,
-          exerciseId: s.exercise_id,
-          weightKg: s.weight_kg == null ? '' : String(s.weight_kg),
-          reps: String(s.reps),
-        })),
+      groups: groupSets(
+        (existing?.routine_sets ?? [])
+          .slice()
+          .sort((a, b) => a.set_order - b.set_order)
+          .map((s) => ({ exerciseId: s.exercise_id, weightKg: s.weight_kg, reps: s.reps })),
+      ).map((g) => ({
+        key: nextKey++,
+        exerciseId: g.exerciseId,
+        numSets: String(g.numSets),
+        reps: String(g.reps),
+        weightKg: g.weightKg == null ? '' : String(g.weightKg),
+      })),
     }),
     [existing],
   )
 
   const [name, setName] = useState(initial.name)
-  const [sets, setSets] = useState<SetRow[]>(initial.sets)
+  const [groups, setGroups] = useState<GroupRow[]>(initial.groups)
   const [formError, setFormError] = useState<string | null>(null)
 
   const isEdit = !!existing
   const busy = createRoutine.isPending || updateRoutine.isPending
 
-  function addSet() {
-    const prev = sets[sets.length - 1]
-    setSets([
-      ...sets,
+  function addGroup() {
+    const prev = groups[groups.length - 1]
+    setGroups([
+      ...groups,
       {
         key: nextKey++,
         exerciseId: prev?.exerciseId ?? exercises?.[0]?.id ?? '',
-        weightKg: prev?.weightKg ?? '',
+        numSets: prev?.numSets ?? '3',
         reps: prev?.reps ?? '',
+        weightKg: prev?.weightKg ?? '',
       },
     ])
   }
 
-  function updateSet(key: number, patch: Partial<SetRow>) {
-    setSets(sets.map((s) => (s.key === key ? { ...s, ...patch } : s)))
+  function updateGroup(key: number, patch: Partial<GroupRow>) {
+    setGroups(groups.map((g) => (g.key === key ? { ...g, ...patch } : g)))
   }
 
   async function addCustomExercise(key: number) {
@@ -89,7 +96,7 @@ function RoutineForm({ existing }: { existing?: RoutineWithSets }) {
     if (!exerciseName) return
     try {
       const ex = await createExercise.mutateAsync(exerciseName)
-      updateSet(key, { exerciseId: ex.id })
+      updateGroup(key, { exerciseId: ex.id })
     } catch (e) {
       setFormError(e instanceof Error ? e.message : 'Could not create exercise')
     }
@@ -105,27 +112,32 @@ function RoutineForm({ existing }: { existing?: RoutineWithSets }) {
       return
     }
 
-    const parsedSets = sets.map((s) => ({
-      exerciseId: s.exerciseId,
-      weightKg: s.weightKg.trim() === '' ? null : Number(s.weightKg),
-      reps: Number(s.reps),
+    const parsedGroups = groups.map((g) => ({
+      exerciseId: g.exerciseId,
+      numSets: Number(g.numSets),
+      reps: Number(g.reps),
+      weightKg: g.weightKg.trim() === '' ? null : Number(g.weightKg),
     }))
-    for (const s of parsedSets) {
-      if (!s.exerciseId) {
-        setFormError('Every set needs an exercise.')
+    for (const g of parsedGroups) {
+      if (!g.exerciseId) {
+        setFormError('Every exercise row needs an exercise.')
         return
       }
-      if (s.weightKg !== null && (!Number.isFinite(s.weightKg) || s.weightKg < 0 || s.weightKg > 1000)) {
+      if (!Number.isInteger(g.numSets) || g.numSets < 1 || g.numSets > 20) {
+        setFormError('Sets must be a whole number between 1 and 20.')
+        return
+      }
+      if (!Number.isInteger(g.reps) || g.reps < 1 || g.reps > 100) {
+        setFormError('Reps must be a whole number between 1 and 100.')
+        return
+      }
+      if (g.weightKg !== null && (!Number.isFinite(g.weightKg) || g.weightKg < 0 || g.weightKg > 1000)) {
         setFormError('Target weight must be between 0 and 1000 kg (or left empty).')
-        return
-      }
-      if (!Number.isInteger(s.reps) || s.reps < 1 || s.reps > 100) {
-        setFormError('Set reps must be a whole number between 1 and 100.')
         return
       }
     }
 
-    const draft: RoutineDraft = { name: trimmed, sets: parsedSets }
+    const draft: RoutineDraft = { name: trimmed, sets: expandGroups(parsedGroups) }
 
     try {
       if (isEdit) {
@@ -146,7 +158,8 @@ function RoutineForm({ existing }: { existing?: RoutineWithSets }) {
           {isEdit ? 'Edit routine' : 'New routine'}
         </h1>
         <p className="mt-1 text-sm text-ink-dim">
-          A template of exercises and reps — target weight is optional.
+          Each row is one exercise: sets × reps per set, with an optional target weight applied to
+          all its sets.
         </p>
       </header>
 
@@ -163,26 +176,26 @@ function RoutineForm({ existing }: { existing?: RoutineWithSets }) {
 
         <fieldset>
           <legend className="mb-1.5 text-xs font-medium uppercase tracking-wide text-ink-dim">
-            Sets
+            Exercises
           </legend>
-          {sets.length === 0 && (
+          {groups.length === 0 && (
             <p className="rounded-lg border border-dashed border-line bg-panel px-4 py-6 text-center text-sm text-ink-faint">
-              Add the sets you always do — exercise and reps, weight if you want a target.
+              Add an exercise with its sets × reps — weight if you want a target.
             </p>
           )}
           <div className="space-y-2">
-            {sets.map((s, i) => (
-              <div key={s.key} className="flex items-center gap-2">
+            {groups.map((g, i) => (
+              <div key={g.key} className="flex items-center gap-2">
                 <span className="w-5 shrink-0 text-right font-display text-xs text-ink-faint">
                   {i + 1}
                 </span>
                 <Select
                   aria-label="Exercise"
-                  value={s.exerciseId}
+                  value={g.exerciseId}
                   onChange={(e) =>
                     e.target.value === '__new__'
-                      ? addCustomExercise(s.key)
-                      : updateSet(s.key, { exerciseId: e.target.value })
+                      ? addCustomExercise(g.key)
+                      : updateGroup(g.key, { exerciseId: e.target.value })
                   }
                   className="flex-1"
                 >
@@ -194,19 +207,23 @@ function RoutineForm({ existing }: { existing?: RoutineWithSets }) {
                   <option value="__new__">+ New exercise…</option>
                 </Select>
                 <Input
-                  aria-label="Target weight (kg, optional)"
+                  aria-label="Sets"
                   type="number"
-                  min={0}
-                  max={1000}
-                  step="0.5"
-                  inputMode="decimal"
-                  placeholder="kg?"
-                  value={s.weightKg}
-                  onChange={(e) => updateSet(s.key, { weightKg: e.target.value })}
-                  className="!w-24 shrink-0"
+                  required
+                  min={1}
+                  max={20}
+                  step="1"
+                  inputMode="numeric"
+                  placeholder="sets"
+                  value={g.numSets}
+                  onChange={(e) => updateGroup(g.key, { numSets: e.target.value })}
+                  className="!w-16 shrink-0"
                 />
+                <span aria-hidden className="shrink-0 text-xs text-ink-faint">
+                  ×
+                </span>
                 <Input
-                  aria-label="Reps"
+                  aria-label="Reps per set"
                   type="number"
                   required
                   min={1}
@@ -214,14 +231,26 @@ function RoutineForm({ existing }: { existing?: RoutineWithSets }) {
                   step="1"
                   inputMode="numeric"
                   placeholder="reps"
-                  value={s.reps}
-                  onChange={(e) => updateSet(s.key, { reps: e.target.value })}
+                  value={g.reps}
+                  onChange={(e) => updateGroup(g.key, { reps: e.target.value })}
+                  className="!w-16 shrink-0"
+                />
+                <Input
+                  aria-label="Target weight for all sets (kg, optional)"
+                  type="number"
+                  min={0}
+                  max={1000}
+                  step="0.5"
+                  inputMode="decimal"
+                  placeholder="kg?"
+                  value={g.weightKg}
+                  onChange={(e) => updateGroup(g.key, { weightKg: e.target.value })}
                   className="!w-20 shrink-0"
                 />
                 <button
                   type="button"
-                  aria-label={`Remove set ${i + 1}`}
-                  onClick={() => setSets(sets.filter((x) => x.key !== s.key))}
+                  aria-label={`Remove exercise row ${i + 1}`}
+                  onClick={() => setGroups(groups.filter((x) => x.key !== g.key))}
                   className="shrink-0 rounded-md px-2 py-1.5 text-sm text-ink-faint transition-colors hover:text-danger"
                 >
                   ✕
@@ -229,8 +258,8 @@ function RoutineForm({ existing }: { existing?: RoutineWithSets }) {
               </div>
             ))}
           </div>
-          <Button type="button" variant="ghost" onClick={addSet} className="mt-2 w-full">
-            + Add set
+          <Button type="button" variant="ghost" onClick={addGroup} className="mt-2 w-full">
+            + Add exercise
           </Button>
         </fieldset>
 
