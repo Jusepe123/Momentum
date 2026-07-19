@@ -12,6 +12,7 @@ import { Button, ErrorText, Input } from '../../components/ui'
 import { SportIcon } from '../../components/SportIcon'
 import { colors, fonts, sportColor } from '../../theme'
 import { uuid4 } from '../../lib/uuid'
+import { expandGroups, groupSets } from '../../lib/setGroups'
 import { ExercisePicker } from './ExercisePicker'
 import {
   fetchExercises,
@@ -31,17 +32,19 @@ const EFFORT_LEVELS = [
 
 const DURATION_PRESETS = [30, 45, 60, 90] as const
 
-/** A set row in the form; `key` is a stable local id so removing a row never
+/** One card = one exercise: N identical sets at one weight (same grouped model
+ *  as the web forms). `key` is a stable local id so removing a card never
  *  reshuffles React keys. */
-interface SetRow {
+interface GroupRow {
   key: string
   exerciseId: string | null
-  weight: string
+  sets: string
   reps: string
+  weight: string
 }
 
-function blankRow(): SetRow {
-  return { key: uuid4(), exerciseId: null, weight: '', reps: '' }
+function blankRow(): GroupRow {
+  return { key: uuid4(), exerciseId: null, sets: '3', reps: '', weight: '' }
 }
 
 /** Parse a weight field to kg. Empty = 0 (bodyweight). Accepts a comma decimal
@@ -65,7 +68,7 @@ export function StrengthScreen({ onBack }: { onBack: () => void }) {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
 
-  const [rows, setRows] = useState<SetRow[]>([blankRow()])
+  const [rows, setRows] = useState<GroupRow[]>([blankRow()])
   const [rpe, setRpe] = useState<number | null>(null)
   const [durationMin, setDurationMin] = useState<number | null>(null)
   const [customDuration, setCustomDuration] = useState('')
@@ -103,16 +106,23 @@ export function StrengthScreen({ onBack }: { onBack: () => void }) {
       return
     }
     setRows(
-      routine.routine_sets.map((s) => ({
+      groupSets(
+        routine.routine_sets.map((s) => ({
+          exerciseId: s.exercise_id,
+          weightKg: s.weight_kg,
+          reps: s.reps,
+        })),
+      ).map((g) => ({
         key: uuid4(),
-        exerciseId: s.exercise_id,
-        weight: s.weight_kg === null ? '' : String(s.weight_kg),
-        reps: String(s.reps),
+        exerciseId: g.exerciseId,
+        sets: String(g.numSets),
+        reps: String(g.reps),
+        weight: g.weightKg === null ? '' : String(g.weightKg),
       })),
     )
   }
 
-  function updateRow(key: string, patch: Partial<SetRow>) {
+  function updateRow(key: string, patch: Partial<GroupRow>) {
     setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)))
   }
 
@@ -123,12 +133,13 @@ export function StrengthScreen({ onBack }: { onBack: () => void }) {
   const effectiveDuration =
     durationMin ?? (customDuration.trim() ? Number(customDuration) : null)
 
-  // A set counts as ready when it has an exercise and a positive rep count.
-  const readySets = rows.filter(
-    (r) => r.exerciseId && Number(r.reps) > 0,
-  )
+  // A card counts as ready when it has an exercise, 1–20 sets, and positive reps.
+  const readyGroups = rows.filter((r) => {
+    const sets = Number(r.sets)
+    return r.exerciseId && Number.isInteger(sets) && sets >= 1 && sets <= 20 && Number(r.reps) > 0
+  })
   const canSave =
-    readySets.length > 0 &&
+    readyGroups.length > 0 &&
     rpe !== null &&
     effectiveDuration !== null &&
     effectiveDuration > 0 &&
@@ -143,11 +154,14 @@ export function StrengthScreen({ onBack }: { onBack: () => void }) {
         durationMin: Math.round(effectiveDuration),
         rpe,
         notes,
-        sets: readySets.map((r) => ({
-          exerciseId: r.exerciseId!,
-          weightKg: parseWeightKg(r.weight),
-          reps: Number(r.reps),
-        })),
+        sets: expandGroups(
+          readyGroups.map((r) => ({
+            exerciseId: r.exerciseId!,
+            numSets: Number(r.sets),
+            weightKg: parseWeightKg(r.weight),
+            reps: Number(r.reps),
+          })),
+        ),
       })
       onBack() // back to Home; history lives on the web app
     } catch (e) {
@@ -210,7 +224,10 @@ export function StrengthScreen({ onBack }: { onBack: () => void }) {
               >
                 <Text style={styles.routineChipText}>{r.name}</Text>
                 <Text style={styles.routineChipCount}>
-                  {r.routine_sets.length} set{r.routine_sets.length === 1 ? '' : 's'}
+                  {(() => {
+                    const n = new Set(r.routine_sets.map((s) => s.exercise_id)).size
+                    return `${n} exercise${n === 1 ? '' : 's'}`
+                  })()}
                 </Text>
               </Pressable>
             ))}
@@ -219,15 +236,15 @@ export function StrengthScreen({ onBack }: { onBack: () => void }) {
       )}
 
       <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Sets</Text>
+        <Text style={styles.sectionLabel}>Exercises</Text>
         {rows.map((row, i) => (
           <View key={row.key} style={styles.setCard}>
             <View style={styles.setCardHeader}>
-              <Text style={styles.setIndex}>Set {i + 1}</Text>
+              <Text style={styles.setIndex}>Exercise {i + 1}</Text>
               {rows.length > 1 && (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`Remove set ${i + 1}`}
+                  accessibilityLabel={`Remove exercise ${i + 1}`}
                   onPress={() => removeRow(row.key)}
                   hitSlop={10}
                 >
@@ -249,13 +266,13 @@ export function StrengthScreen({ onBack }: { onBack: () => void }) {
 
             <View style={styles.numRow}>
               <View style={styles.numField}>
-                <Text style={styles.numLabel}>Weight (kg)</Text>
+                <Text style={styles.numLabel}>Sets</Text>
                 <TextInput
-                  value={row.weight}
-                  onChangeText={(t) => updateRow(row.key, { weight: t })}
-                  placeholder="0"
+                  value={row.sets}
+                  onChangeText={(t) => updateRow(row.key, { sets: t.replace(/[^0-9]/g, '') })}
+                  placeholder="3"
                   placeholderTextColor={colors.inkFaint}
-                  keyboardType="decimal-pad"
+                  keyboardType="number-pad"
                   style={styles.numInput}
                 />
               </View>
@@ -270,10 +287,26 @@ export function StrengthScreen({ onBack }: { onBack: () => void }) {
                   style={styles.numInput}
                 />
               </View>
+              <View style={styles.numField}>
+                <Text style={styles.numLabel}>Weight (kg)</Text>
+                <TextInput
+                  value={row.weight}
+                  onChangeText={(t) => updateRow(row.key, { weight: t })}
+                  placeholder="0"
+                  placeholderTextColor={colors.inkFaint}
+                  keyboardType="decimal-pad"
+                  style={styles.numInput}
+                />
+              </View>
             </View>
+            <Text style={styles.groupHint}>Weight applies to every set of this exercise.</Text>
           </View>
         ))}
-        <Button title="+ Add set" variant="ghost" onPress={() => setRows((rs) => [...rs, blankRow()])} />
+        <Button
+          title="+ Add exercise"
+          variant="ghost"
+          onPress={() => setRows((rs) => [...rs, blankRow()])}
+        />
       </View>
 
       <View style={styles.section}>
@@ -349,7 +382,7 @@ export function StrengthScreen({ onBack }: { onBack: () => void }) {
       <Button title="Save session" onPress={handleSave} busy={saving} disabled={!canSave} />
       {!canSave && !saving && (
         <Text style={styles.hint}>
-          Add at least one set with an exercise and reps, pick an effort, and set a duration.
+          Add at least one exercise with sets and reps, pick an effort, and set a duration.
         </Text>
       )}
 
@@ -589,5 +622,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.inkFaint,
     textAlign: 'center',
+  },
+  groupHint: {
+    fontFamily: fonts.text,
+    fontSize: 11,
+    color: colors.inkFaint,
   },
 })
