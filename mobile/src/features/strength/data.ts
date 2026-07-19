@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase'
 import { todayLocalISO } from '../../lib/dates'
+import { reduceLastLifts, type LastLift } from '../../lib/lastLifts'
 import type { Tables } from '../../lib/database.types'
 
 export type Exercise = Tables<'exercises'>
@@ -26,6 +27,20 @@ export async function fetchRoutines(): Promise<RoutineWithSets[]> {
     ...r,
     routine_sets: [...r.routine_sets].sort((a, b) => a.set_order - b.set_order),
   }))
+}
+
+/** Each exercise's most recent top set, from the last 20 strength sessions —
+ *  powers the "Last time: 50 kg × 8" progressive-overload hint. RLS scopes the
+ *  query to the signed-in user. */
+export async function fetchLastLifts(): Promise<Record<string, LastLift>> {
+  const { data, error } = await supabase
+    .from('sessions')
+    .select('date, strength_sets(exercise_id, weight_kg, reps)')
+    .eq('sport', 'strength')
+    .order('date', { ascending: false })
+    .limit(20)
+  if (error) throw error
+  return reduceLastLifts(data)
 }
 
 export interface StrengthSetDraft {

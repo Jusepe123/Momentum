@@ -5,7 +5,7 @@ import { listPending, removePending } from '../../upload/pending'
 import { uploadRun } from '../../upload/uploadRun'
 import { Button, ErrorText } from '../../components/ui'
 import { SportIcon } from '../../components/SportIcon'
-import { avatarUri, fetchProfile } from './data'
+import { avatarUri, fetchProfile, fetchWeekDistance, type WeekDistance } from './data'
 import { colors, fonts, sportColor } from '../../theme'
 
 type Sport = 'strength' | 'run' | 'bike'
@@ -28,6 +28,10 @@ function todayLabel(now = new Date()): string {
   return `${WEEKDAYS[now.getDay()]}, ${MONTHS[now.getMonth()]} ${now.getDate()}`
 }
 
+function formatKm(km: number): string {
+  return Number.isInteger(km) ? String(km) : km.toFixed(1)
+}
+
 /**
  * The app's front door: pick a discipline to record (or log). Run and Bike open
  * the GPS recorder for that sport; Strength opens its form. Runs finished
@@ -45,18 +49,24 @@ export function HomeScreen({
   const [syncing, setSyncing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [avatar, setAvatar] = useState<string | null>(null)
+  const [week, setWeek] = useState<WeekDistance | null>(null)
 
   useEffect(() => {
     listPending().then((list) => setPendingCount(list.length))
   }, [])
 
-  // The profile photo (set on the web) is non-critical: on any failure we keep
-  // the email-initial fallback rather than surface an error.
+  // The profile photo and the weekly-distance strip are non-critical: on any
+  // failure we keep the fallback (initial / no strip) rather than surface an error.
   useEffect(() => {
     let cancelled = false
     fetchProfile()
       .then((p) => {
         if (!cancelled) setAvatar(avatarUri(p))
+      })
+      .catch(() => {})
+    fetchWeekDistance()
+      .then((d) => {
+        if (!cancelled) setWeek(d)
       })
       .catch(() => {})
     return () => {
@@ -103,6 +113,28 @@ export function HomeScreen({
         <Text style={styles.eyebrow}>{todayLabel()}</Text>
         <Text style={styles.heading}>What are you{'\n'}training today?</Text>
       </View>
+
+      {week !== null && week.runKm + week.bikeKm > 0 && (
+        <View style={styles.weekStrip} accessibilityLabel="Distance this week">
+          <Text style={styles.weekLabel}>This week</Text>
+          {week.runKm > 0 && (
+            <View style={styles.weekItem}>
+              <View style={[styles.weekDot, { backgroundColor: sportColor.run }]} />
+              <Text style={styles.weekText}>
+                Run <Text style={styles.weekValue}>{formatKm(week.runKm)} km</Text>
+              </Text>
+            </View>
+          )}
+          {week.bikeKm > 0 && (
+            <View style={styles.weekItem}>
+              <View style={[styles.weekDot, { backgroundColor: sportColor.bike }]} />
+              <Text style={styles.weekText}>
+                Bike <Text style={styles.weekValue}>{formatKm(week.bikeKm)} km</Text>
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
 
       <View style={styles.cards}>
         {DISCIPLINES.map((d, i) => (
@@ -252,6 +284,46 @@ const styles = StyleSheet.create({
     lineHeight: 33,
     color: colors.ink,
     letterSpacing: -0.4,
+  },
+  weekStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 12,
+    backgroundColor: colors.panel,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  weekLabel: {
+    fontFamily: fonts.textSemi,
+    fontSize: 11,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    color: colors.inkFaint,
+  },
+  weekItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  weekDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  weekText: {
+    fontFamily: fonts.text,
+    fontSize: 13,
+    color: colors.inkDim,
+  },
+  weekValue: {
+    fontFamily: fonts.displaySemi,
+    fontSize: 14,
+    color: colors.ink,
+    fontVariant: ['tabular-nums'],
   },
   cards: {
     gap: 14,

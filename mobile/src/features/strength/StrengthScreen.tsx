@@ -14,8 +14,10 @@ import { colors, fonts, sportColor } from '../../theme'
 import { uuid4 } from '../../lib/uuid'
 import { expandGroups, groupSets } from '../../lib/setGroups'
 import { ExercisePicker } from './ExercisePicker'
+import type { LastLift } from '../../lib/lastLifts'
 import {
   fetchExercises,
+  fetchLastLifts,
   fetchRoutines,
   uploadStrength,
   type Exercise,
@@ -65,6 +67,7 @@ function parseWeightKg(raw: string): number {
 export function StrengthScreen({ onBack }: { onBack: () => void }) {
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [routines, setRoutines] = useState<RoutineWithSets[]>([])
+  const [lastLifts, setLastLifts] = useState<Record<string, LastLift>>({})
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
 
@@ -92,6 +95,12 @@ export function StrengthScreen({ onBack }: { onBack: () => void }) {
       .finally(() => {
         if (!cancelled) setLoading(false)
       })
+    // Non-critical: the "last time" hints just stay absent if this fails.
+    fetchLastLifts()
+      .then((lifts) => {
+        if (!cancelled) setLastLifts(lifts)
+      })
+      .catch(() => {})
     return () => {
       cancelled = true
     }
@@ -299,7 +308,17 @@ export function StrengthScreen({ onBack }: { onBack: () => void }) {
                 />
               </View>
             </View>
-            <Text style={styles.groupHint}>Weight applies to every set of this exercise.</Text>
+            {row.exerciseId && lastLifts[row.exerciseId] ? (
+              <Text style={styles.groupHint}>
+                Last time:{' '}
+                <Text style={styles.groupHintStrong}>
+                  {lastLifts[row.exerciseId].weightKg} kg × {lastLifts[row.exerciseId].reps}
+                </Text>{' '}
+                — match it or nudge the weight up.
+              </Text>
+            ) : (
+              <Text style={styles.groupHint}>Weight applies to every set of this exercise.</Text>
+            )}
           </View>
         ))}
         <Button
@@ -627,5 +646,10 @@ const styles = StyleSheet.create({
     fontFamily: fonts.text,
     fontSize: 11,
     color: colors.inkFaint,
+  },
+  groupHintStrong: {
+    fontFamily: fonts.textSemi,
+    color: colors.inkDim,
+    fontVariant: ['tabular-nums'],
   },
 })
