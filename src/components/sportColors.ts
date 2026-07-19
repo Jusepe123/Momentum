@@ -12,3 +12,10 @@ export const sportBgClass: Record<Sport, string> = {
   run: 'bg-sport-run/10',
   bike: 'bg-sport-bike/10',
 }
+
+/** Full-strength fills for data marks (calendar cells, bar segments). */
+export const sportSolidBgClass: Record<Sport, string> = {
+  strength: 'bg-sport-strength',
+  run: 'bg-sport-run',
+  bike: 'bg-sport-bike',
+}

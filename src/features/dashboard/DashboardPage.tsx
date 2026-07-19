@@ -13,6 +13,7 @@ import {
   YAxis,
 } from 'recharts'
 import { BrandImage } from '../../components/brand'
+import { sportSolidBgClass } from '../../components/sportColors'
 import { Alert, Button, Select } from '../../components/ui'
 import { todayLocalISO } from '../../lib/dates'
 import { formatDate, formatMinSec } from '../../lib/format'
@@ -25,16 +26,19 @@ import {
   type MetricPoint,
 } from '../../lib/scoring'
 import { useSessions, type SessionWithDetails } from '../sessions/hooks'
+import { sportMeta } from '../sessions/sportMeta'
 import { axisProps, chart } from './chartTheme'
 import { ChartTooltip } from './ChartTooltip'
 import {
   acwrSeries,
+  calendarWeeks,
   computePRs,
   dailyLoadSeries,
   paceHistory,
   speedHistory,
   strengthHistories,
   toLoadPoints,
+  weeklyDistanceKm,
 } from './selectors'
 
 const LOAD_WINDOW_DAYS = 56 // 8 weeks
@@ -452,6 +456,154 @@ function PRGrid({ sessions, today }: { sessions: SessionWithDetails[]; today: st
   )
 }
 
+const CALENDAR_WEEKS = 12
+const CALENDAR_SPORTS = ['strength', 'run', 'bike'] as const
+
+function monthShort(isoDate: string): string {
+  return new Date(`${isoDate}T00:00:00Z`).toLocaleString('en-US', {
+    month: 'short',
+    timeZone: 'UTC',
+  })
+}
+
+function TrainingCalendarCard({
+  sessions,
+  today,
+}: {
+  sessions: SessionWithDetails[]
+  today: string
+}) {
+  const weeks = useMemo(() => calendarWeeks(sessions, today, CALENDAR_WEEKS), [sessions, today])
+
+  // Month label over the first week whose Monday starts a new month.
+  const monthLabels = weeks.map((week, w) =>
+    w === 0 || monthShort(week[0].date) !== monthShort(weeks[w - 1][0].date)
+      ? monthShort(week[0].date)
+      : null,
+  )
+  // Avoid the leading label colliding with a change right after it.
+  if (monthLabels[1] || monthLabels[2]) monthLabels[0] = null
+
+  return (
+    <Card title="Training calendar" subtitle={`Last ${CALENDAR_WEEKS} weeks — one square per day`}>
+      <div className="overflow-x-auto pb-1">
+        <div className="flex gap-1 text-[9px] text-ink-faint" aria-hidden>
+          <div className="w-3 shrink-0" />
+          {monthLabels.map((label, w) => (
+            <div key={w} className="w-5 shrink-0 overflow-visible whitespace-nowrap">
+              {label}
+            </div>
+          ))}
+        </div>
+        <div className="mt-1 flex gap-1">
+          <div
+            className="flex w-3 shrink-0 flex-col gap-1 text-[9px] leading-none text-ink-faint"
+            aria-hidden
+          >
+            {['M', '', 'W', '', 'F', '', ''].map((d, i) => (
+              <div key={i} className="flex h-5 items-center">
+                {d}
+              </div>
+            ))}
+          </div>
+          {weeks.map((week, w) => (
+            <div key={w} className="flex shrink-0 flex-col gap-1">
+              {week.map((day) => {
+                if (day.inFuture) return <div key={day.date} className="size-5" />
+                const label =
+                  day.sports.length > 0
+                    ? `${formatDate(day.date)} — ${day.sports
+                        .map((sp) => sportMeta[sp].label)
+                        .join(' + ')} · ${Math.round(day.load)} load`
+                    : `${formatDate(day.date)} — rest`
+                return (
+                  <div
+                    key={day.date}
+                    role="img"
+                    aria-label={label}
+                    title={label}
+                    className="flex size-5 gap-px overflow-hidden rounded bg-panel-2"
+                  >
+                    {day.sports.map((sp) => (
+                      <div key={sp} className={`min-w-0 flex-1 ${sportSolidBgClass[sp]}`} />
+                    ))}
+                  </div>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+      <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
+        {CALENDAR_SPORTS.map((sp) => (
+          <li key={sp} className="flex items-center gap-1.5 text-xs text-ink-dim">
+            <span aria-hidden className={`size-2.5 rounded-sm ${sportSolidBgClass[sp]}`} />
+            {sportMeta[sp].label}
+          </li>
+        ))}
+        <li className="flex items-center gap-1.5 text-xs text-ink-dim">
+          <span aria-hidden className="size-2.5 rounded-sm bg-panel-2" />
+          Rest
+        </li>
+      </ul>
+    </Card>
+  )
+}
+
+function WeeklyDistanceCard({
+  sessions,
+  today,
+}: {
+  sessions: SessionWithDetails[]
+  today: string
+}) {
+  const { runKm, bikeKm } = useMemo(() => weeklyDistanceKm(sessions, today), [sessions, today])
+  const total = runKm + bikeKm
+  const fmt = (km: number) => (Number.isInteger(km) ? String(km) : km.toFixed(1))
+
+  return (
+    <Card title="Distance this week" subtitle="Run + bike km since Monday">
+      {total === 0 ? (
+        <EmptyHint>Log a run or a ride and your weekly kilometres stack up here.</EmptyHint>
+      ) : (
+        <>
+          <p>
+            <span className="font-display text-3xl font-bold tracking-tight">{fmt(total)}</span>{' '}
+            <span className="text-sm text-ink-dim">km</span>
+          </p>
+          <div className="mt-3 flex h-3 gap-0.5 overflow-hidden rounded-full" aria-hidden>
+            {runKm > 0 && (
+              <div
+                className={sportSolidBgClass.run}
+                style={{ flexGrow: runKm, flexBasis: 0 }}
+                title={`Run ${fmt(runKm)} km`}
+              />
+            )}
+            {bikeKm > 0 && (
+              <div
+                className={sportSolidBgClass.bike}
+                style={{ flexGrow: bikeKm, flexBasis: 0 }}
+                title={`Bike ${fmt(bikeKm)} km`}
+              />
+            )}
+          </div>
+          <ul className="mt-3 space-y-1.5">
+            {(['run', 'bike'] as const).map((sp) => (
+              <li key={sp} className="flex items-center gap-2 text-sm text-ink-dim">
+                <span aria-hidden className={`size-2.5 rounded-sm ${sportSolidBgClass[sp]}`} />
+                {sportMeta[sp].label}
+                <span className="ml-auto font-display font-semibold text-ink">
+                  {fmt(sp === 'run' ? runKm : bikeKm)} km
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </Card>
+  )
+}
+
 export function DashboardPage() {
   const { data: sessions, isLoading, error } = useSessions()
   const today = todayLocalISO()
@@ -508,6 +660,12 @@ export function DashboardPage() {
         <div className="lg:col-span-2">
           <LoadTrendCard sessions={sessions} today={today} />
         </div>
+      </div>
+      <div className="grid gap-3 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <TrainingCalendarCard sessions={sessions} today={today} />
+        </div>
+        <WeeklyDistanceCard sessions={sessions} today={today} />
       </div>
       <div className="grid gap-3 lg:grid-cols-2">
         <StrengthProgressCard sessions={sessions} />

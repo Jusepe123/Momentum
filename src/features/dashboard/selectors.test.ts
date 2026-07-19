@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest'
 import type { SessionWithDetails } from '../sessions/hooks'
 import {
   acwrSeries,
+  calendarWeeks,
   computePRs,
   dailyLoadSeries,
   paceHistory,
   speedHistory,
   strengthHistories,
+  weeklyDistanceKm,
 } from './selectors'
 
 type Overrides = Partial<SessionWithDetails> & { date: string }
@@ -211,5 +213,75 @@ describe('computePRs', () => {
 
   it('returns empty for no sessions', () => {
     expect(computePRs([], '2026-07-03')).toEqual([])
+  })
+})
+
+describe('calendarWeeks', () => {
+  // 2026-07-19 is a Sunday; the 2 weeks ending there run Mon 07-06 → Sun 07-19.
+  it('builds Monday-first weeks ending with the week of asOf', () => {
+    const weeks = calendarWeeks([], '2026-07-19', 2)
+    expect(weeks).toHaveLength(2)
+    expect(weeks[0][0].date).toBe('2026-07-06')
+    expect(weeks[0][6].date).toBe('2026-07-12')
+    expect(weeks[1][0].date).toBe('2026-07-13')
+    expect(weeks[1][6].date).toBe('2026-07-19')
+  })
+
+  it('pads days after asOf when asOf is mid-week', () => {
+    const weeks = calendarWeeks([], '2026-07-15', 1) // Wednesday
+    expect(weeks[0][2]).toMatchObject({ date: '2026-07-15', inFuture: false })
+    expect(weeks[0][3]).toMatchObject({ date: '2026-07-16', inFuture: true })
+  })
+
+  it('collects unique sports in fixed order and sums the load per day', () => {
+    const sessions = [
+      session({ date: '2026-07-15', sport: 'run', unified_load: 100 }),
+      session({ date: '2026-07-15', sport: 'strength', unified_load: 200 }),
+      session({ date: '2026-07-15', sport: 'run', unified_load: 50 }),
+      session({ date: '2026-07-06', sport: 'bike', unified_load: 80 }),
+    ]
+    const weeks = calendarWeeks(sessions, '2026-07-19', 2)
+    expect(weeks[1][2]).toMatchObject({
+      date: '2026-07-15',
+      sports: ['strength', 'run'],
+      load: 350,
+    })
+    expect(weeks[0][0]).toMatchObject({ date: '2026-07-06', sports: ['bike'], load: 80 })
+    expect(weeks[0][1].sports).toEqual([])
+  })
+})
+
+describe('weeklyDistanceKm', () => {
+  it('sums run and bike km for the Monday-first week containing asOf', () => {
+    const sessions = [
+      session({
+        date: '2026-07-13',
+        sport: 'run',
+        cardio_details: { session_id: 's', distance_m: 7000 },
+      }),
+      session({
+        date: '2026-07-15',
+        sport: 'run',
+        cardio_details: { session_id: 's', distance_m: 5000 },
+      }),
+      session({
+        date: '2026-07-17',
+        sport: 'bike',
+        cardio_details: { session_id: 's', distance_m: 20000 },
+      }),
+      // previous week — excluded
+      session({
+        date: '2026-07-12',
+        sport: 'run',
+        cardio_details: { session_id: 's', distance_m: 6000 },
+      }),
+      // strength has no distance
+      session({ date: '2026-07-14', sport: 'strength' }),
+    ]
+    expect(weeklyDistanceKm(sessions, '2026-07-19')).toEqual({ runKm: 12, bikeKm: 20 })
+  })
+
+  it('returns zeros for an empty week', () => {
+    expect(weeklyDistanceKm([], '2026-07-19')).toEqual({ runKm: 0, bikeKm: 0 })
   })
 })

@@ -49,6 +49,82 @@ export function dailyLoadSeries(
   return out
 }
 
+const SPORT_ORDER = ['strength', 'run', 'bike'] as const
+type Sport = (typeof SPORT_ORDER)[number]
+
+export interface CalendarDay {
+  date: string
+  /** Unique sports trained that day, in fixed strength/run/bike order. */
+  sports: Sport[]
+  load: number
+  /** Day falls after asOf (grid padding to complete the week). */
+  inFuture: boolean
+}
+
+/** Monday index 0–6 for an epoch day (1970-01-01 was a Thursday). */
+function mondayIndex(day: number): number {
+  return ((day % 7) + 3) % 7
+}
+
+/**
+ * Monday-first weeks × 7 days ending with the week containing asOf, each day
+ * carrying the sports trained and total load — feeds the calendar heatmap.
+ */
+export function calendarWeeks(
+  sessions: SessionWithDetails[],
+  asOf: string,
+  weeks: number,
+): CalendarDay[][] {
+  const end = epochDay(asOf)
+  const weekStart = end - mondayIndex(end)
+  const start = weekStart - (weeks - 1) * 7
+
+  const byDay = new Map<number, { sports: Set<Sport>; load: number }>()
+  for (const s of sessions) {
+    const day = epochDay(s.date)
+    if (day < start || day > end) continue
+    const entry = byDay.get(day) ?? { sports: new Set<Sport>(), load: 0 }
+    entry.sports.add(s.sport)
+    entry.load += s.unified_load ?? sessionLoad(s.rpe, s.duration_min)
+    byDay.set(day, entry)
+  }
+
+  const out: CalendarDay[][] = []
+  for (let w = 0; w < weeks; w++) {
+    const week: CalendarDay[] = []
+    for (let i = 0; i < 7; i++) {
+      const day = start + w * 7 + i
+      const entry = byDay.get(day)
+      week.push({
+        date: isoFromEpochDay(day),
+        sports: SPORT_ORDER.filter((sp) => entry?.sports.has(sp) ?? false),
+        load: entry?.load ?? 0,
+        inFuture: day > end,
+      })
+    }
+    out.push(week)
+  }
+  return out
+}
+
+/** Run and bike km for the Monday-first week containing asOf. */
+export function weeklyDistanceKm(
+  sessions: SessionWithDetails[],
+  asOf: string,
+): { runKm: number; bikeKm: number } {
+  const end = epochDay(asOf)
+  const weekStart = end - mondayIndex(end)
+  let runM = 0
+  let bikeM = 0
+  for (const s of sessions) {
+    const day = epochDay(s.date)
+    if (day < weekStart || day > end || !s.cardio_details) continue
+    if (s.sport === 'run') runM += s.cardio_details.distance_m
+    if (s.sport === 'bike') bikeM += s.cardio_details.distance_m
+  }
+  return { runKm: runM / 1000, bikeKm: bikeM / 1000 }
+}
+
 /** One ACWR ratio per day for the `days` days ending at asOf. */
 export function acwrSeries(
   sessions: SessionWithDetails[],
